@@ -1,0 +1,38 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+credentials.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Node.js
+node_modules/
+dist/
+build/
+
+# Databases
+*.sqlite3
+*.db
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs, archives, temporary files
+*.log
+*.zip
+*.bak
+*.tmp
