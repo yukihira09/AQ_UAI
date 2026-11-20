@@ -1,0 +1,131 @@
+{
+  "source": "aq_uai.zip",
+  "count": 25,
+  "files": [
+    {
+      "original": "aq_uai/README.md",
+      "new_path": "docs/prototype/README_ORIGINAL.md",
+      "sha256": "5eb2a610858828692b7d2cc2c826a879f8368e7bd215624e154ae87d49e9becd"
+    },
+    {
+      "original": "aq_uai/index.html",
+      "new_path": "apps/web/index.html",
+      "sha256": "789b7f618501161e34ae19522c3f68a241d3e4b87ce923b0121c24dc1c7e527f"
+    },
+    {
+      "original": "aq_uai/preview-module2-groups.png",
+      "new_path": "apps/web/preview-module2-groups.png",
+      "sha256": "8e807b2cc37119a03775a65799f2719957a28bad8d5a071753911b5693c19321"
+    },
+    {
+      "original": "aq_uai/preview-module2-lookup-collapsed.png",
+      "new_path": "apps/web/preview-module2-lookup-collapsed.png",
+      "sha256": "4ed4646da49e4fbc60ddd1356d8640e6dda10aefd21f698998b2c1e8be422cb6"
+    },
+    {
+      "original": "aq_uai/preview-module2-lookup.png",
+      "new_path": "apps/web/preview-module2-lookup.png",
+      "sha256": "732f6e494866366260b6bb41a73f83167cc84544d4135e6c203eedb90ad5ff48"
+    },
+    {
+      "original": "aq_uai/module2/module2.js",
+      "new_path": "apps/web/module2/module2.js",
+      "sha256": "4e3936ad29c09a1cff09f1cff895114f0b1ee4017d689bb963dd588af97e9b64"
+    },
+    {
+      "original": "aq_uai/module2/module2.css",
+      "new_path": "apps/web/module2/module2.css",
+      "sha256": "57ac3b780f7d25aced54503b71cb17bc93433a15d85686aba125fe546c4b9507"
+    },
+    {
+      "original": "aq_uai/shared/actions.js",
+      "new_path": "apps/web/shared/actions.js",
+      "sha256": "2e009ac96c622714a0ed1c7522d99c3f10ea2f15b1cbd304fd1e6be261ccf5e8"
+    },
+    {
+      "original": "aq_uai/shared/base.css",
+      "new_path": "apps/web/shared/base.css",
+      "sha256": "2f3dbfd28b0df25042dacd3fe2c7b93497b4dd3750a3176b255fc45652709a88"
+    },
+    {
+      "original": "aq_uai/shared/core.js",
+      "new_path": "apps/web/shared/core.js",
+      "sha256": "2a3d66bdc3870888aec8541c771f3bf5cd846b554e2a3af310a6b2cbb25daf14"
+    },
+    {
+      "original": "aq_uai/shared/dialogs.js",
+      "new_path": "apps/web/shared/dialogs.js",
+      "sha256": "96967e69ed7bf028fe462b693982144910caf643b9365f0e2283e3cbffc2a51e"
+    },
+    {
+      "original": "aq_uai/docs/IMPLEMENTATION_STATUS.md",
+      "new_path": "docs/prototype/IMPLEMENTATION_STATUS.md",
+      "sha256": "16ad51339b7e2a815cdbdb049480c359f0946500f046b1ee125f51ba90672114"
+    },
+    {
+      "original": "aq_uai/docs/MANUAL_TESTS.md",
+      "new_path": "docs/prototype/MANUAL_TESTS.md",
+      "sha256": "1ceaba4297839c31e718d66501d1f3b1f67fb9eb7e48a6a99ecb08a11e454fa4"
+    },
+    {
+      "original": "aq_uai/docs/SCREENSHOT_MAPPING.md",
+      "new_path": "docs/prototype/SCREENSHOT_MAPPING.md",
+      "sha256": "cf6cfd8b2c30d3ade476142f23aa95f0ac5d716731a82b1db564664d1feaf82c"
+    },
+    {
+      "original": "aq_uai/docs/screenshots/module1-dpa.png",
+      "new_path": "docs/prototype/screenshots/module1-dpa.png",
+      "sha256": "654bcc6aca8ba4b92efa396fc46f3f7c6757a4bf3ba02d9dabbe4160360ee4e6"
+    },
+    {
+      "original": "aq_uai/docs/screenshots/module2-groups.png",
+      "new_path": "docs/prototype/screenshots/module2-groups.png",
+      "sha256": "8e807b2cc37119a03775a65799f2719957a28bad8d5a071753911b5693c19321"
+    },
+    {
+      "original": "aq_uai/docs/screenshots/module2-lookup-compact.png",
+      "new_path": "docs/prototype/screenshots/module2-lookup-compact.png",
+      "sha256": "b31c224d45d379e48a11a082dee9e013f066e1430c10178ef9f4ac07bcdb87f6"
+    },
+    {
+      "original": "aq_uai/docs/screenshots/module2-lookup.png",
+      "new_path": "docs/prototype/screenshots/module2-lookup.png",
+      "sha256": "4ed4646da49e4fbc60ddd1356d8640e6dda10aefd21f698998b2c1e8be422cb6"
+    },
+    {
+      "original": "aq_uai/docs/screenshots/module3-defaults.png",
+      "new_path": "docs/prototype/screenshots/module3-defaults.png",
+      "sha256": "e38bf5ee4ec60b07261ca1278e900881900811acdb5be9b384d4dc2a09a705a7"
+    },
+    {
+      "original": "aq_uai/docs/screenshots/module3-ledger.png",
+      "new_path": "docs/prototype/screenshots/module3-ledger.png",
+      "sha256": "e00550f4a50865e706cb3347025f0de1316294fc9ca7e8174cf76db821725fea"
+    },
+    {
+      "original": "aq_uai/docs/screenshots/module3-recipients.png",
+      "new_path": "docs/prototype/screenshots/module3-recipients.png",
+      "sha256": "6e67d1a418b6f6ecc0858cdc45e48bdd7083841216acecf3c6e1a59f6093ccc9"
+    },
+    {
+      "original": "aq_uai/module3/module3.js",
+      "new_path": "apps/web/module3/module3.js",
+      "sha256": "39667abe8c54489ca591e85891d375d85c2c281899b11dda66abe5e30503dd49"
+    },
+    {
+      "original": "aq_uai/module3/module3.css",
+      "new_path": "apps/web/module3/module3.css",
+      "sha256": "2ef12e5f6c0b020a7218a7ab445b82bbd270357b1cda52626635160ee3ac0fb6"
+    },
+    {
+      "original": "aq_uai/module1/module1.css",
+      "new_path": "apps/web/module1/module1.css",
+      "sha256": "2001c89ad9a6c4185fa4a8b32a63a7d19711692e14b9aed949bd21e3d0abee73"
+    },
+    {
+      "original": "aq_uai/module1/module1.js",
+      "new_path": "apps/web/module1/module1.js",
+      "sha256": "f9b2b33e1a63ff4a164b9b1cb313b0b7217db6982c84d15520905bb41d2b2c75"
+    }
+  ]
+}

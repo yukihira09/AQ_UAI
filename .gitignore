@@ -1,38 +1,47 @@
-# Environment and secrets
+# Local secrets and configuration
 .env
 .env.*
 !.env.example
 *.pem
 *.key
-secrets/
-credentials.json
+*.p12
+*.pfx
+.pgpass
+.pg_service.conf
 
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
 .venv/
 venv/
 .pytest_cache/
-
-# Node.js
-node_modules/
-dist/
+.ruff_cache/
+.coverage
+*.egg-info/
 build/
+dist/
 
-# Databases
-*.sqlite3
+# JavaScript / frontend tools (future)
+node_modules/
+apps/web/dist/
+
+# Local databases, exports, backups, and logs
+*.sqlite
 *.db
+*.log
+*.sql
+*.sql.gz
+*.sql.zst
+*.dump
+*.dump.gz
+*.dump.zst
+*.pgdump
+*.backup
+backups/
+secrets/
 
-# IDE
+# Editor / OS
 .vscode/
 .idea/
-
-# OS files
 .DS_Store
 Thumbs.db
-
-# Logs, archives, temporary files
-*.log
-*.zip
-*.bak
-*.tmp

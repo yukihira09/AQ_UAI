@@ -1,0 +1,60 @@
+# AQ EduUAI Phase 2 shared foundation
+
+**Status:** WP1 and WP2 accepted for continued development using standalone verification. WP3 approved and pending independent acceptance. WP4 through WP7 require separate gate approval. See [ADR-0002](../architecture/ADR-0002-phase2-shared-foundation.md).
+
+Extend the existing synchronous FastAPI, SQLAlchemy, Alembic, and PostgreSQL application. Preserve the Phase 1 migration, metadata, and diagnostic HTTP contracts. Keep the three modules under the demo origin. Preserve the historical asset manifest and the approved shared-layout correction. The local identity directory is authoritative. The company framework is an optional future integration.
+
+## Identity schema and authorization
+
+Use UUIDs for entities, timezone-aware timestamps, and named database constraints. Start with one institution through operator provisioning. Use institution-aware composite foreign keys where a row refers to more than one institutional entity. A cross-institution reference must fail even when every UUID exists. Use indexes for foreign-key lookups, lists, and session revocation.
+
+| Records | Schema contract |
+|---|---|
+| Institutions and units | Institutions have a stable UUID, unique code, and name. Flat units have an institution, institution-local unique code, name, and active state. Directory services refuse to deactivate units with active users or live unit grants. |
+| Users and credentials | A person has a stable UUID, institution, required primary unit, name, globally unique canonical username, staff or student code type, institutional code, and `PENDING`, `ACTIVE`, or `DISABLED` state. Usernames are trimmed, lowercased ASCII identifiers of 1–64 characters using letters, digits, dots, underscores, and hyphens, starting with a letter or digit. PostgreSQL requires the canonical value. Trim institutional codes at input and compare them case-sensitively within institution and code type. Uniqueness applies to disabled identities. Store the password hash and password-change flag in separate one-to-one credentials. Preserve user UUIDs and historical references. |
+| Groups and memberships | Group kinds are `SYSTEM`, `AUTHORIZATION`, and `AI_SPECIALIST`. Each group has an institution, an institution-local unique code, a name, and active state. One row per group and user holds current membership state and timestamps. Audit events record changes. Group kind is immutable through application operations. |
+| Roles and grants | The global catalog uses stable role and permission codes. Separate direct-user and group assignment tables hold a role and subject in an institution. `GLOBAL` requires a null unit. `UNIT` requires a unit from the same institution. A subject can hold a role once per scope. `FOUNDATION_ADMIN` requires a direct global grant. Only active authorization groups may confer other roles. |
+| Sessions and throttling | Each session stores a unique 32-byte token digest, user, issuance, absolute expiry after issuance, and optional revocation at or after issuance. Authentication throttling stores counters per normalized login or trusted address digest and time window. |
+| Audit events | Store institution when known, actor when authenticated, action, target type and ID, outcome, event time, request ID, and allowlisted changes. Actor references include institution and restrict deletion. Unauthenticated attempts may have an absent actor. |
+
+The one-primary-unit model, username format, code normalization, code uniqueness by type, and reservation of disabled identities are provisional v1 decisions. Confirm them with the institution before onboarding real users. Keep multi-affiliation, SSO, external directory synchronization, and code recycling deferred.
+
+Evaluate role grants using current user, membership, group, and grant state on each request. One applicable grant must supply both the requested permission and its scope. `GLOBAL` means institution-wide and `UNIT` means exactly the named unit. Apply scope in queries for rows, counts, and search. Check source and destination units before transfers. Centralize authorization-group membership, activation, and grant changes so ordinary group administration cannot convey permissions. Serialize changes that could disable or remove the last active direct administrator.
+
+| Seed role | Permissions | Allowed grant scope |
+|---|---|---|
+| `FOUNDATION_ADMIN` | `directory.read`, `directory.profile.update`, `directory.manage`, `authorization.manage`, `audit.read` | Direct `GLOBAL` only |
+| `DIRECTORY_READER` | `directory.read` | `GLOBAL` or `UNIT` |
+| `UNIT_DIRECTORY_MANAGER` | `directory.read`, `directory.profile.update` | `UNIT` only |
+
+Basic profile edits are limited to the display name. Creation, identity-code or username changes, account-state changes, transfers, and ordinary institution-wide group changes require central directory administration. Authorization-group changes and grant management require central authorization permission. Limit audit reads to global audit permission. Seed only the shared catalog in WP1. Introduce module permissions with their concrete operations.
+
+## Runtime contracts for subsequent packages
+
+- **Transactions and audit.** Commit each successful administrative mutation and its audit event in the same transaction. An audit insert failure rolls back the change. Record failed sign-ins independently. Use allowlisted change details. Give the runtime role audit insert and required select privileges. Reserve schema ownership and maintenance privileges for a separate database role. Document provisioning for fresh and existing Phase 1 volumes.
+- **Authentication.** Use Argon2id. An interactive operator command bootstraps the initial institution, unit, and direct global administrator atomically. Use an operator reset command and temporary credentials that permit only self-identification, password change, and logout. Require the current password for self-service changes. Start with an eight-hour absolute session lifetime. Throttle at five failures per normalized login or 30 per trusted client address in a 15-minute window. Return generic credential errors and generic `429` responses. Serialize the final login check with disablement or password reset. Revoke all sessions on password reset, password change, and disablement. Authorization changes apply to requests started after the change commits.
+- **Browser.** Use a fresh opaque host-only `HttpOnly` cookie with `SameSite=Lax` and `Secure` under HTTPS. An explicit loopback HTTP setting is available for development. Require the configured Origin on login and authenticated writes. Return a session-bound CSRF token through authenticated `GET /api/v1/auth/me`, keep it in browser memory, and require it as a header on writes. Set auth responses to `no-store`. Serve admin and its API together on `admin.localhost` in development. Keep the demo on `localhost` and limit the demo host's API proxy to the Phase 1 diagnostics. A new path or port alone does not isolate cookies.
+- **API.** Use `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me`, and `POST /api/v1/auth/change-password`. Use explicit operations to change state, transfer users, and add or remove memberships and grants. Scope list queries before pagination. Return `code`, `message`, optional sanitized `details`, and `request_id` on Phase 2 errors. Use `401` for invalid sessions, `403` for missing operation permission, `404` for records outside the visible scope, and `409` for state and uniqueness conflicts. Preserve the Phase 1 response bodies and verify the required schema revision through readiness.
+
+See [WP2 database roles and rollout](wp2-operations.md) for privilege boundaries and transaction examples. See [WP3 authentication and rollout](wp3-operations.md) for current startup, operator recovery, and session handling.
+
+## Seven work packages
+
+Record exact verification commands, results, skipped tests, and residual risks at every gate. Use disposable PostgreSQL databases. Obtain review before applying schema changes to the existing development database.
+
+| Package | Prerequisite and permitted changes | Acceptance and negative tests |
+|---|---|---|
+| **WP1 · Schema** | Approved specification. ORM and metadata registration, additive Alembic revision, role catalog seed, PostgreSQL tests, and schema documentation. | Clean and populated Phase 1 upgrades preserve metadata, reach the exact revision, and leave a second upgrade as a no-op. ORM and migration agree. Reject invalid usernames, duplicates, cross-institution references, malformed scopes, and invalid session timelines. |
+| **WP2 · Audit, transactions, and errors** | WP1 accepted. Database role provisioning, audit writer, transaction boundary, request IDs, errors, and readiness. | Runtime audit insert succeeds while update, delete, and truncate fail. Audit failure rolls back a privileged write. A stale schema returns the existing diagnostic `503` body. Unexpected errors redact validation and SQL input values. |
+| **WP3 · Authentication** | WP2 accepted and auth defaults reviewed. Bootstrap and reset CLI, credential lifecycle, sessions, throttling, and auth routes. | Concurrent bootstrap is atomic. Wrong passwords, absent accounts, and disabled users get generic failures. Verify rotation, revocation, expiry, origin, CSRF, throttling, temporary credential restrictions, and login races with reset and disable. |
+| **WP4 · RBAC** | WP3 accepted. Policy services and policy tests. | Verify direct and approved group grants, read/write separation, exact-unit access, and immediate re-evaluation on subsequent requests. Reject permission and scope combined from separate grants and reject unauthorized membership-based elevation. |
+| **WP5 · Protected directory** | WP4 accepted. User, unit, group, membership, grant, and audit-read APIs. | Verify scoped pagination, account lifecycle, transfer, and transactional audit. Reject invisible objects, forged server-controlled fields, invalid transfer destinations, and concurrent changes that would remove the last administrator. |
+| **WP6 · Browser integration** | WP5 accepted. Add admin pages and loopback nginx hostname routing. | Verify login, password change, logout, and persistence after reload through nginx. Reject the demo origin and direct unauthorized writes. Verify the demo assets and all three module views against the historical manifest and approved layout changes. |
+| **WP7 · Verification** | WP6 accepted. CI, end-to-end verification, restore rehearsal, and handoff docs. | Run Phase 1 smoke and frontend checks, real PostgreSQL security and migration tests, and browser tests. Verify the restored identities and audit history. Record limitations and keep module FRD acceptance pending. |
+
+## FRD requirements and Product Owner decisions
+
+- [MDL](../frd/AQ-FRD-UAI-MDL-001.md) retains edit-equivalent access for the configuration screen under FR-MDL-001. Confirm whether leadership needs a separate read-only view before MDL UI work. FR-MDL-020 and FR-MDL-021 still require a real quota-free connection test and retrievable routing revisions.
+- [QTA](../frd/AQ-FRD-UAI-QTA-001.md) retains system-group reconciliation, specialist groups, and additive multi-group entitlement under FR-QTA-020, FR-QTA-022, and FR-QTA-030. Confirm the system-group source and timing of entitlement changes before QTA implementation. Keep account disablement separate from AI quota suspension.
+- [CRT](../frd/AQ-FRD-UAI-CRT-001.md) retains named-recipient and unit-scoped operations, append-only ledger history, and FR-CRT-031 offboarding recovery as a later Should. Agree on visibility of past transactions after transfers and on budget ownership, units, and any conversion before QTA/CRT accounting. Do not infer a conversion from the demo.
+- Confirm provisional institutional identity assumptions and audit readership and retention before using real identities. The approved foundation introduces no direct FRD conflict. Module acceptance still requires each module's own evidence.

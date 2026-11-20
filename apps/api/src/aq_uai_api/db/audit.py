@@ -1,0 +1,113 @@
+"""Insert typed, low-sensitivity audit events into a service-owned transaction."""
+
+from enum import StrEnum
+from typing import Literal
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy.orm import Session, SessionTransactionOrigin
+
+from aq_uai_api.db.identity import AuditEvent
+
+
+class AuditAction(StrEnum):
+    UNIT_STATE_CHANGED = "unit.state_changed"
+    USER_STATE_CHANGED = "user.state_changed"
+    MEMBERSHIP_STATE_CHANGED = "membership.state_changed"
+    AUTH_LOGIN_REJECTED = "auth.login_rejected"
+    AUTH_LOGIN_SUCCEEDED = "auth.login_succeeded"
+    AUTH_LOGOUT = "auth.logout"
+    AUTH_PASSWORD_CHANGED = "auth.password_changed"
+    AUTH_OPERATOR_RESET = "auth.operator_reset"
+    AUTH_ADMIN_BOOTSTRAPPED = "auth.admin_bootstrapped"
+
+
+class _AuditChanges(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid", strict=True, frozen=True, revalidate_instances="always"
+    )
+
+
+class ActiveChange(_AuditChanges):
+    before: bool
+    after: bool
+
+
+class UserStateChange(_AuditChanges):
+    before: Literal["PENDING", "ACTIVE", "DISABLED"]
+    after: Literal["PENDING", "ACTIVE", "DISABLED"]
+
+
+class RevocationCount(_AuditChanges):
+    revoked_sessions: int = Field(ge=0)
+
+
+_EVENT_RULES = {
+    AuditAction.UNIT_STATE_CHANGED: ("unit", "SUCCESS", ActiveChange),
+    AuditAction.USER_STATE_CHANGED: ("user", "SUCCESS", UserStateChange),
+    AuditAction.MEMBERSHIP_STATE_CHANGED: ("group_membership", "SUCCESS", ActiveChange),
+    AuditAction.AUTH_LOGIN_REJECTED: ("login", "FAILURE", None),
+    AuditAction.AUTH_LOGIN_SUCCEEDED: ("user", "SUCCESS", None),
+    AuditAction.AUTH_LOGOUT: ("user", "SUCCESS", None),
+    AuditAction.AUTH_PASSWORD_CHANGED: ("user", "SUCCESS", RevocationCount),
+    AuditAction.AUTH_OPERATOR_RESET: ("user", "SUCCESS", RevocationCount),
+    AuditAction.AUTH_ADMIN_BOOTSTRAPPED: ("user", "SUCCESS", None),
+}
+_OPERATOR_ACTIONS = {AuditAction.AUTH_OPERATOR_RESET, AuditAction.AUTH_ADMIN_BOOTSTRAPPED}
+
+
+def write_audit_event(
+    session: Session,
+    *,
+    action: AuditAction,
+    request_id: UUID,
+    institution_id: UUID | None = None,
+    actor_id: UUID | None = None,
+    target_id: UUID | None = None,
+    changes: ActiveChange | UserStateChange | RevocationCount | None = None,
+) -> AuditEvent:
+    transaction = session.get_transaction()
+    if transaction is None or transaction.origin != SessionTransactionOrigin.BEGIN:
+        raise RuntimeError("Audit writes require an explicit service transaction.")
+    if not isinstance(action, AuditAction) or not isinstance(request_id, UUID):
+        raise ValueError("Unsupported audit action or request ID.")
+    if any(
+        value is not None and not isinstance(value, UUID)
+        for value in (institution_id, actor_id, target_id)
+    ):
+        raise ValueError("Audit identifiers must be UUIDs.")
+
+    target_type, outcome, change_model = _EVENT_RULES[action]
+    if action == AuditAction.AUTH_LOGIN_REJECTED:
+        if actor_id is not None or target_id is not None:
+            raise ValueError("Rejected sign-in events contain no actor or target ID.")
+    elif action in _OPERATOR_ACTIONS:
+        if institution_id is None or target_id is None or actor_id is not None:
+            raise ValueError("Operator events require an institution and target without an actor.")
+    elif institution_id is None or actor_id is None or target_id is None:
+        raise ValueError("Administrative events require institution, actor, and target IDs.")
+
+    if change_model is None:
+        if changes is not None:
+            raise ValueError("This audit action has no change payload.")
+        payload = {}
+    else:
+        if type(changes) is not change_model:
+            raise ValueError("Unsupported audit changes for this action.")
+        try:
+            payload = change_model.model_validate(changes).model_dump(mode="json")
+        except ValueError:
+            raise ValueError("Invalid audit changes for this action.") from None
+
+    event = AuditEvent(
+        institution_id=institution_id,
+        actor_id=actor_id,
+        action=action.value,
+        target_type=target_type,
+        target_id=target_id,
+        outcome=outcome,
+        request_id=str(request_id),
+        changes=payload,
+    )
+    session.add(event)
+    return event

@@ -1,5 +1,5 @@
 // Shared delegated event handlers and demo-only state mutations.
-function updatePage(page){if(!['models','quotas','credits'].includes(page))return;ui.page=page;ui.modal=null;ui.sidebarOpen=(page==='quotas');location.hash=page==='models'?'module1':page==='quotas'?'module2':'module3';render();window.scrollTo({top:0,behavior:'instant'});}
+function updatePage(page){if(!['models','quotas','credits'].includes(page))return;ui.page=page;ui.modal=null;location.hash=page==='models'?'module1':page==='quotas'?'module2':'module3';render();window.scrollTo({top:0,behavior:'instant'});}
 function openModal(type,id){if(type==='model'){ui.modelModalTab='connection';ui.modelDraftTested=false;ui.showSecret=false;}ui.modal={type,id};render();}
 function closeModal(){ui.modal=null;render();}
 function addEvent(type,userId,info){db.events.push({type,userId,info,at:todayStamp()});}
@@ -39,7 +39,6 @@ function dispatch(action,el){
     break;
   }
   case 'tab':{ui.tab[el.dataset.page]=el.dataset.tab;
-    if(el.dataset.page==='quotas')ui.sidebarOpen=(el.dataset.tab==='groups');
     render();break;}
   case 'add-model':openModal('model');break;
   case 'edit-model':openModal('model',id);break;
@@ -190,4 +189,5 @@ document.addEventListener('input',e=>{
  const next=document.querySelector(`[data-search="${which}"]`);if(next){next.focus();next.setSelectionRange(position,position);}
 });
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&ui.modal)closeModal();});
+window.addEventListener('hashchange',()=>{const page=pageFromHash();if(page!==ui.page){ui.page=page;ui.modal=null;render();}});
 render();

@@ -1,0 +1,52 @@
+name: AQ EduUAI quality gates
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  baseline-and-python:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18.7
+        env:
+          POSTGRES_USER: aq_uai_ci
+          POSTGRES_PASSWORD: ci_only_test_password
+          POSTGRES_DB: aq_uai_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aq_uai_ci -d aq_uai_ci"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      AQ_UAI_ENVIRONMENT: test
+      AQ_UAI_DB_HOST: localhost
+      AQ_UAI_DB_PORT: '5432'
+      AQ_UAI_DB_NAME: aq_uai_ci
+      AQ_UAI_DB_USER: aq_uai_ci
+      AQ_UAI_DB_PASSWORD: ci_only_test_password
+      AQ_UAI_RUN_DB_TESTS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install API and test dependencies
+        run: python -m pip install -e './apps/api[dev]'
+      - name: Verify frontend byte parity and assets
+        run: |
+          python scripts/verify_frontend_assets.py
+          for f in apps/web/shared/*.js apps/web/module*/*.js; do node --check "$f"; done
+          node scripts/test_sidebar_navigation.cjs
+      - name: Ruff quality check
+        run: ruff check apps/api/src apps/api/tests
+      - name: Verify rendered Compose credential isolation
+        run: python scripts/verify_wp2_compose.py --env-file .env.example --project-name aq-wp2-ci
+      - name: Apply Alembic migrations to clean PostgreSQL
+        run: alembic -c apps/api/alembic.ini upgrade head
+      - name: Run API tests including live PostgreSQL
+        run: pytest -q apps/api/tests

@@ -250,6 +250,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 }
 
 .topbar-title {
+  min-width:0;
+  overflow-wrap:anywhere;
   font-weight:800;
   font-size:11px;
   letter-spacing:.35px;
@@ -275,6 +277,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 }
 
 .content {
+  overflow-x:auto;
   max-width:1460px;
   margin:auto;
   padding:24px 30px 60px

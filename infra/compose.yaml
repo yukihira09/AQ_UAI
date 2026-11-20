@@ -1,0 +1,99 @@
+# Development-only stack. Run from repository root:
+# docker compose --env-file .env -f infra/compose.yaml up --build -d
+name: aq-uai-dev
+services:
+  db:
+    image: postgres:18.7
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Please set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Please set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Please set POSTGRES_PASSWORD in .env}
+    volumes:
+      # PostgreSQL 18 stores PGDATA under /var/lib/postgresql/18/docker.
+      # Mount the parent, NOT /var/lib/postgresql/data.
+      - postgres_data:/var/lib/postgresql
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-55432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 3s
+      timeout: 3s
+      retries: 25
+    restart: unless-stopped
+
+  provision:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    environment:
+      AQ_UAI_DB_HOST: db
+      AQ_UAI_DB_PORT: "5432"
+      AQ_UAI_DB_NAME: ${POSTGRES_DB:?}
+      AQ_UAI_DB_USER: ${POSTGRES_USER:?}
+      AQ_UAI_DB_PASSWORD: ${POSTGRES_PASSWORD:?}
+      AQ_UAI_MIGRATION_PASSWORD: ${AQ_UAI_MIGRATION_PASSWORD:?Set the schema-owner password}
+      AQ_UAI_RUNTIME_PASSWORD: ${AQ_UAI_RUNTIME_PASSWORD:?Set the runtime password}
+    command: ["python", "-m", "aq_uai_api.db.provision", "prepare"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  migrate:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    environment:
+      AQ_UAI_DB_HOST: db
+      AQ_UAI_DB_PORT: "5432"
+      AQ_UAI_DB_NAME: ${POSTGRES_DB:?}
+      AQ_UAI_DB_USER: aq_uai_schema
+      AQ_UAI_DB_PASSWORD: ${AQ_UAI_MIGRATION_PASSWORD:?Set the schema-owner password}
+    command: ["python", "-m", "aq_uai_api.db.provision", "migrate"]
+    depends_on:
+      provision:
+        condition: service_completed_successfully
+    restart: "no"
+
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    environment:
+      AQ_UAI_ENVIRONMENT: ${AQ_UAI_ENVIRONMENT:-development}
+      AQ_UAI_AUTH_ORIGIN: ${AQ_UAI_AUTH_ORIGIN:-http://admin.localhost:${WEB_HOST_PORT:-8000}}
+      AQ_UAI_AUTH_ALLOW_HTTP_LOCAL: ${AQ_UAI_AUTH_ALLOW_HTTP_LOCAL:-true}
+      AQ_UAI_AUTH_TRUSTED_PROXY_IP: ${AQ_UAI_AUTH_TRUSTED_PROXY_IP:-}
+      AQ_UAI_AUTH_THROTTLE_KEY: ${AQ_UAI_AUTH_THROTTLE_KEY:?Set the authentication throttle key}
+      AQ_UAI_DB_HOST: db
+      AQ_UAI_DB_PORT: "5432"
+      AQ_UAI_DB_NAME: ${POSTGRES_DB:?}
+      AQ_UAI_DB_USER: aq_uai_runtime
+      AQ_UAI_DB_PASSWORD: ${AQ_UAI_RUNTIME_PASSWORD:?Set the runtime password}
+    command: ["uvicorn", "aq_uai_api.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log", "--no-proxy-headers"]
+    ports:
+      - "127.0.0.1:${API_HOST_PORT:-8001}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  web:
+    image: nginx:stable-alpine
+    ports:
+      - "127.0.0.1:${WEB_HOST_PORT:-8000}:80"
+    volumes:
+      - ../apps/web:/usr/share/nginx/html:ro
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

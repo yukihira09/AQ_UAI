@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AQ EduUAI — Phase 1 connectivity demo</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, sans-serif; }
+    body { max-width: 820px; margin: 3rem auto; padding: 0 1rem; color: #17212c; }
+    h1 { font-size: 1.8rem; }
+    .sub { color: #556373; }
+    .flow { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin: 1.5rem 0; }
+    .flow strong { background: #e7f1f2; padding: .8rem; border-radius: .5rem; }
+    .card { background: #f7f9fb; border: 1px solid #d8e1ea; padding: 1rem; margin: 1rem 0; border-radius: .6rem; }
+    button { background: #176d76; color: white; border: 0; border-radius: .4rem; padding: .8rem 1rem; font-weight: 600; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: wait; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+    .error { color: #ad2424; }
+    a { color: #176d76; }
+  </style>
+</head>
+<body>
+  <p><a href="/#module1">← Back to the original frontend</a></p>
+  <h1>Phase 1 — Check the real connection</h1>
+  <p class="sub">This page is a development diagnostic, not part of the three FRD modules. It does not modify the old frontend or use its demo data.</p>
+  <div class="flow" aria-label="Request flow">
+    <strong>Browser (this page)</strong> → <strong>nginx /api proxy</strong> → <strong>FastAPI</strong> → <strong>PostgreSQL</strong>
+  </div>
+  <button type="button" id="check">Run connectivity checks</button>
+  <div class="card">
+    <h2>Backend health (no database)</h2>
+    <pre id="health" aria-live="polite">Not checked</pre>
+  </div>
+  <div class="card">
+    <h2>Backend readiness (database & migration)</h2>
+    <pre id="ready" aria-live="polite">Not checked</pre>
+  </div>
+  <div class="card">
+    <h2>Value read from PostgreSQL</h2>
+    <pre id="info" aria-live="polite">Not checked</pre>
+  </div>
+  <p class="sub">If the last result says <code>source: postgresql</code> and <code>milestone: phase-1-foundation</code>, this browser has successfully obtained information that FastAPI read from the database.</p>
+  <script>
+    const endpoints = [
+      ['/api/v1/health', 'health'],
+      ['/api/v1/ready', 'ready'],
+      ['/api/v1/system/info', 'info'],
+    ];
+    const btn = document.querySelector('#check');
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      for (const [url, id] of endpoints) {
+        const output = document.getElementById(id);
+        output.classList.remove('error');
+        output.textContent = `Checking ${url}...`;
+        try {
+          const response = await fetch(url, { headers: { Accept: 'application/json' } });
+          const body = await response.json();
+          output.textContent = `HTTP ${response.status}\n${JSON.stringify(body, null, 2)}`;
+          if (!response.ok) output.classList.add('error');
+        } catch (error) {
+          output.textContent = `Connection failed: ${String(error)}`;
+          output.classList.add('error');
+        }
+      }
+      btn.disabled = false;
+    });
+  </script>
+</body>
+</html>

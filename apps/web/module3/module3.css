@@ -8,11 +8,6 @@
 .credits-module .subtitle{font-size:16px;line-height:1.45;color:#7b8da7;max-width:810px}
 .credits-module .breadcrumbs{font-size:13px;margin-top:14px}
 .credits-module .actions>.btn.primary{height:54px;border-radius:10px;background:#5143e9;font-size:16px;box-shadow:0 3px 8px #5143e92a;padding:0 21px}
-.credits-shell .topbar{height:79px}
-.credits-shell .topbar-title{font-size:16px;letter-spacing:.7px;color:#34445c}
-.credits-shell .topbar-right{font-size:13px;letter-spacing:.5px}
-.credits-shell .topbar-select{font-size:15px;padding:9px 16px}
-.credits-shell .burger{font-size:21px}
 .crt-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:25px;margin:0 0 28px}
 .crt-stat{display:flex;justify-content:space-between;gap:10px;min-width:0;min-height:186px;padding:28px 26px;background:#fff;border:1px solid #dce5f0;border-radius:22px;box-shadow:0 2px 4px #1b294414}
 .crt-stat>div{min-width:0}

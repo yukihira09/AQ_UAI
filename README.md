@@ -1,111 +1,84 @@
-# AQ EduUAI — Frontend starter (Module 1 + Module 2 + Module 3)
+# AQ EduUAI — independent development workspace
 
-A small Vietnamese-language frontend learning prototype, organized by module. It is **not** a production service. It has **no backend APIs, authentication, database, actual LLM connection, credential storage, or automatic scheduled quota reset**. All demo data is synthetic and persisted in the browser's `localStorage`.
+**Current milestone: Phase 2 WP3 authentication under review.** The three frontend modules remain browser-only demonstrations. The API supports diagnostics and local authentication. RBAC administration and the module APIs require later packages.
 
-This project combines earlier Module 1 work (model catalog, Add/Edit Model dialog, gateway routing tab, DPA legal-record tab) with newly reconstructed Module 2 screens (six-group quota table and per-user cumulative quota audit). Module 3 is now screenshot-aligned across its recipient, audit-log, and default-policy views, with browser-only grant/reclaim interactions.
+> **New to backend development?** Begin with [Phase 0–1 setup guide](docs/setup/PHASE_0_1.md). It explains every command and the frontend → API → PostgreSQL flow.
 
-## 1. Run on Linux (no npm packages required)
+## Start in three commands
 
-After downloading and extracting the ZIP:
+For an existing Phase 1 or WP1 volume, follow the [consolidated WP3 rollout](docs/phase2/wp3-operations.md#rollout-after-approval). For a fresh install, run from this repository root with Docker and Docker Compose running:
 
 ```bash
-cd aq_uai
-python3 -m http.server 8000
+cp .env.example .env
+# Edit .env and set distinct database passwords plus the authentication throttle key.
+bash scripts/dev-up.sh
 ```
 
-Open in your browser:
+- Frontend: http://localhost:8000/#module1
+- Authenticated admin API: http://admin.localhost:8000/api/v1/auth/me
+- Visual API/database connection demo: http://localhost:8000/dev/phase1.html
+- Database-backed JSON response: http://localhost:8000/api/v1/system/info
+- FastAPI interactive documentation: http://localhost:8001/docs
 
-- **Module 1:** http://localhost:8000/#module1
-- **Module 2:** http://localhost:8000/#module2
-- **Module 3:** http://localhost:8000/#module3
+Stop without deleting database data:
 
-Navigate between modules with the sidebar (use the ☰ icon to reveal or collapse it). Quit the local server using `Ctrl+C`.
+```bash
+bash scripts/dev-down.sh
+```
 
-To open the code in VS Code: `code .`
-
-> You MUST serve the folder from `aq_uai/` because `index.html` references `shared/` and each module by relative paths. Don't open `module2/module2.js` as a webpage.
-
-## 2. Project layout
+## Top-level layout
 
 ```text
 aq_uai/
-├── index.html                  # Loads all CSS/JS files in the correct order
-├── shared/
-│   ├── base.css                # Common layout, sidebar, tables, forms, dialogs
-│   ├── core.js                 # Synthetic data, shared state, lookup/calculation helpers, app shell
-│   ├── dialogs.js              # Model, group, quota, grant/reclaim form dialogs
-│   └── actions.js              # Navigation, user events, form handling, local demo mutations
-├── module1/
-│   ├── module1.css             # Screenshot-based Module 1 styling
-│   └── module1.js              # Model catalog, routing, DPA screen
-├── module2/
-│   ├── module2.css             # New screenshot-based Module 2 styling
-│   └── module2.js              # Group quota table and cumulative individual lookup
-├── module3/
-│   ├── module3.css             # Screenshot-based Module 3 responsive styling
-│   └── module3.js              # Credit dashboard, recipients, ledger, default policies
-└── docs/
-    ├── IMPLEMENTATION_STATUS.md
-    ├── MANUAL_TESTS.md
-    └── screenshots/
-        ├── module1-dpa.png
-        ├── module2-groups.png
-        └── module2-lookup.png
+  apps/web/                Original frontend (moved unchanged) and new diagnostic page
+    index.html
+    shared/                Existing demo state, actions, dialogs, CSS
+    module1/ module2/ module3/
+    dev/phase1.html        Real backend/database connectivity demo
+  apps/api/                FastAPI application, tests and Alembic migrations
+    src/aq_uai_api/        Python API package
+    migrations/            The one source of truth for database schema changes
+    tests/                 Unit tests + opt-in PostgreSQL integration test
+  infra/                   Development Docker Compose + nginx routing
+  docs/frd/                The exact three FRD Markdown sources
+  docs/prototype/          Preserved original frontend README, notes and screenshots
+  docs/architecture/       Architecture blueprint + frontend source audit
+  docs/setup/              Beginner-friendly setup / verification instructions
+  docs/decisions/          Documented engineering decisions
+  scripts/                 Start, stop and verification helpers
+  .github/workflows/ci.yml Automated checks on GitHub
 ```
 
-The `shared/` folder is intentional: all three modules use the same navigation, synthetic records, form helpers, and browser events, so those components are defined once.
+## Independent checks
 
-The project intentionally uses browser-native `<script>` loading with no build step, transpiler, or frontend framework. Shared function/state declarations are loaded first; per-module renderers are loaded next; shared dialogs and delegated events are loaded last. **Preserve script order in `index.html`.**
+```bash
+python3 scripts/verify_frontend_assets.py
+python3 scripts/verify_frontend_baseline.py   # Phase-0 historical check only
+python3 scripts/verify_original_archive.py     # Phase-0 historical check only
+for f in apps/web/shared/*.js apps/web/module*/*.js; do node --check "$f"; done
+```
 
-## 3. What works in the demo
+Backend tests (requires Python 3.12 and dependencies installed):
 
-### Module 1 — Cấu hình Nhà cung cấp & Mô hình AI
-- Search/filter model catalog, switch between grid/list view, add/edit model details.
-- Demo connection-test status and primary/backup routing constraints.
-- DPA legal-agreement table with synthetic records and editable provider details.
-- API key field is visual-only: no real secrets are stored or transmitted.
+```bash
+python3 -m pip install -e './apps/api[dev]'
+python3 -m pytest -q apps/api/tests/unit
+```
 
-### Module 2 — Hạn mức AI theo Nhóm tài khoản
-- Six illustrative groups (system groups and specialized AI groups), model-specific quotas, source and status filters.
-- Create/edit groups and memberships, edit model quotas, demonstrate group synchronization without deleting specialized groups.
-- Per-person lookup with actual **sum across all groups for each model**. Example: `NS001` has `2,000 + 5,000 + 10,000 = 17,000` GPT-4o tokens and `5,000 + 10,000 + 25,000 = 40,000` Gemini tokens.
-- Synthetic model usage progress bars. Demo suspend/restore status and a manual month reset action.
-- School-wide monthly budget modal remains accessible below the Module 2 screens.
+Backend API endpoints now available:
 
-### Module 3 — Cấp / Thu hồi Hạn mức
-- Demo supplementary grants and partial/full reclaim, required decision references, balance checks, and a browser-local read-only ledger.
-- CSV export for the synthetic ledger.
-- **Credits are deliberately not converted into Module 2 tokens**; no conversion policy has been approved.
+| Path | Behavior |
+| --- | --- |
+| `GET /api/v1/health` | API liveness; no database required |
+| `GET /api/v1/ready` | Database connectivity and migration readiness |
+| `GET /api/v1/system/info` | Reads a marker from the *real* PostgreSQL `app_metadata` table |
 
-## 4. Important non-production limitations
+No user-management, provider, quota, or ledger endpoints exist yet. These will be added under server-enforced permissions in later phases; existing frontend demo interactions are not backed by these APIs.
 
-- `localStorage` can be edited by the user and does not provide security, immutability, or transaction guarantees.
-- No authentication/authorization (RBAC), real synchronized user directory, API calls, or persistent server database.
-- Provider tests, AI usage counts, synchronization, and monthly reset are simulated in the browser.
-- Real business rules (token ↔ credit conversion, institutional allocation and ledger source-of-truth) require PO/Tech Lead decisions before implementing backend accounting.
-- Styling is a close visual recreation, not a pixel-perfect copy. The UI has been tested at a large desktop viewport; smaller screens rely on responsive tables that may scroll horizontally.
+## Before modifying or pushing to GitHub
 
-## 5. Where to edit next
+The uploaded source ZIP did not contain its `.git/` directory, so this package deliberately does not include or reinitialize Git. **Use your existing `AQ_UAI` repository** and merge new files there. See the [Git instructions](docs/setup/PHASE_0_1.md#f-github--preserve-your-existing-remote).
 
-- Module 1 page/UI: `module1/module1.js`, `module1/module1.css`.
-- Module 2 page/UI: `module2/module2.js`, `module2/module2.css`.
-- Module 3 page/UI: `module3/module3.js`, `module3/module3.css` (currently uses common styles).
-- Shared dialogs: `shared/dialogs.js`.
-- Synthetic data, quotas and other shared functions: `shared/core.js`.
-- Button actions and form validation: `shared/actions.js`.
+**Coding agent instructions:** `AGENTS.md` lists the rules and checks future Codex contributions should follow.
 
-To reset demo data manually, open your browser DevTools → Application/Storage → Local Storage, delete `aq_uai-demo-v1`, then reload. **This clears only this demo site's sample state**, not company data.
-
-## 6. Update: Compact Module 2 audit + redesigned Module 3 (v4)
-
-**Module 2:** the individual model-by-model cumulative quota table uses proportional column widths and wraps long formulas, rather than forcing a 1190px minimum table width. Switching to the individual audit tab automatically collapses the sidebar to give the table more room (you can reopen it). At narrow/mobile widths the table switches to stacked row cards rather than introducing horizontal scrolling. The seeded examples for NS001 are GPT-4o **17,000**, Gemini **40,000**, Claude **18,000**, and DeepSeek **80,000** tokens per month.
-
-**Module 3:** the three prototype tabs are reconstructed with larger text and styles isolated in `module3/module3.css`:
-
-1. **Danh sách Đối tượng Cấp Mở rộng**: four summary cards, search/category/status filters, a nine-column responsive table, progress bars, sample recipient context, and per-recipient grant/reclaim buttons.
-2. **Sổ cái Lịch sử Phân bổ (Audit Log)**: a compliance banner, append-only-looking ledger, colored transaction badges, decision references, audit actor, notes, and CSV demo export.
-3. **Định mức Tiêu chuẩn Mặc định**: four editable role-based allowance cards, a `Lưu quy chế` button storing browser-local reference values, and explicit clarification that those settings do not yet affect the real quota accounting model.
-
-All three module pages use one shared application shell (`shared/`), and Module 1 is retained. Browser demo operations still use `localStorage`; this is **not a secure ledger** or real billing implementation. Tokens and credits are **not automatically converted**. Seeded figures may differ from reference screenshots because the demo totals are computed from the sample records instead of hardcoded dashboard values.
-
-If you have used an earlier version of this starter, your browser may retain its earlier synthetic records. To see the new example values, use the demo reset control if accessible, or delete this local site's `aq_uai-demo-v1` key in the browser's local storage. This deletes only your locally saved demo changes.
+**Security:** This is a localhost development stack, not a production deployment. Never publish API/DB ports or real credentials until Phase 2 authentication, authorization, and security reviews are complete.
