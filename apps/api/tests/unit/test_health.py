@@ -84,5 +84,5 @@ def test_system_info_fails_closed() -> None:
 def test_business_routes_not_pretended_to_exist() -> None:
     with TestClient(create_app()) as client:
         assert client.get("/api/v1/providers").status_code == 404
-        assert client.get("/api/v1/users").status_code == 404
+        assert client.get("/api/v1/users").status_code == 401
         assert client.get("/api/v1/ledger").status_code == 404

@@ -4,8 +4,8 @@ Read `README.md`, `docs/setup/PHASE_0_1.md`, `docs/architecture/BLUEPRINT_v1.md`
 
 ## Milestone and scope
 
-- Phase 0 and Phase 1 established the demo and API/DB baseline. Phase 2 WP1 and WP2 are accepted in standalone verification. WP3 implements local authentication and awaits independent review.
-- Phase 2 WP4–WP7 and Phase 3+ MDL/QTA/CRT server business logic require separate authorization.
+- Phase 0 and Phase 1 established the demo and API/DB baseline. Phase 2 WP1–WP5 are accepted for continued source development. WP6 adds browser administration and WP7 supplies verification and handoff.
+- Live rollout and Phase 3+ MDL/QTA/CRT server business logic require separate authorization.
 - Do not claim FRD acceptance from frontend demo interactions or stub/mock-only backend behavior.
 - Never implement later-phase features without explicit scoped instructions.
 

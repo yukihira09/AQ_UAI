@@ -131,7 +131,8 @@ def apply_runtime_privileges(connection: Connection, roles: DatabaseRoles) -> No
     if "user_credentials" in present:
         connection.execute(
             sql.SQL(
-                "GRANT SELECT, UPDATE (password_hash, must_change_password, updated_at) "
+                "GRANT SELECT, INSERT (user_id, password_hash, must_change_password), "
+                "UPDATE (password_hash, must_change_password, updated_at) "
                 "ON TABLE public.user_credentials TO {}"
             ).format(runtime)
         )
@@ -149,6 +150,33 @@ def apply_runtime_privileges(connection: Connection, roles: DatabaseRoles) -> No
                 "ON TABLE public.auth_throttle_buckets TO {}"
             ).format(runtime)
         )
+    directory_writes = {
+        "units": "INSERT (institution_id, code, name), UPDATE (code, name, active)",
+        "users": (
+            "INSERT (institution_id, primary_unit_id, username, display_name, code_type, "
+            "institutional_code, state), UPDATE (primary_unit_id, username, display_name, "
+            "code_type, institutional_code, state, updated_at)"
+        ),
+        "account_groups": (
+            "INSERT (institution_id, code, name, kind), UPDATE (name, active, updated_at)"
+        ),
+        "group_memberships": (
+            "INSERT (institution_id, group_id, user_id, active), UPDATE (active, updated_at)"
+        ),
+        "user_role_assignments": (
+            "INSERT (institution_id, user_id, role_code, scope, unit_id), DELETE"
+        ),
+        "group_role_assignments": (
+            "INSERT (institution_id, group_id, role_code, scope, unit_id), DELETE"
+        ),
+    }
+    for table, privileges in directory_writes.items():
+        if table in present:
+            connection.execute(
+                sql.SQL("GRANT {} ON TABLE {} TO {}").format(
+                    sql.SQL(privileges), sql.Identifier("public", table), runtime
+                )
+            )
 
 
 def prepare_database(

@@ -25,7 +25,7 @@ WP1 adds the tables that later packages will use to identify people, store sessi
 
 ## Rules for later services
 
-WP2 supplies [restricted database roles, append-only runtime audit access, and transaction conventions](wp2-operations.md). WP3 will normalize login inputs, hash passwords, issue and revoke sessions, and apply throttle rules. WP4 and WP5 will enforce authorization-group eligibility, group-kind immutability, delegation, active-state and visibility checks, membership history, unit deactivation and transfers, and last-admin protection.
+WP2 supplies [restricted database roles, append-only runtime audit access, and transaction conventions](wp2-operations.md). WP3 provides [local authentication](wp3-operations.md). WP4 provides [authorization-group eligibility, exact-unit and institution scope, and transaction-time write guards](wp4-policy.md). WP5 implements [directory and grant writes, membership history, unit lifecycle, transfers, and last-admin protection](wp5-api.md) using the existing schema.
 
 Group-kind eligibility and immutability require service checks. PostgreSQL validates the allowed values and the group's institution. A direct SQL write can still change a kind or attach a limited role to an ineligible group. Keeping those rules in the policy and directory services avoids duplicated category columns or database triggers. Group-derived authority must check eligibility at both assignment and evaluation time. The database already blocks group-derived foundation administrator grants.
 

@@ -463,7 +463,7 @@ def test_address_throttle_ignores_forged_forwarding_and_cleanup_is_bounded(
         ).fetchone() == (30,)
 
 
-def test_audit_failure_rolls_back_login_and_runtime_cannot_grant_roles(bootstrapped, caplog):
+def test_audit_failure_rolls_back_login_and_runtime_cannot_rewrite_grant_or_tenant(bootstrapped, caplog):
     fixture = bootstrapped
     with connect(fixture.owner) as db:
         db.execute(safer_revoke_audit(fixture.roles.runtime))
@@ -474,8 +474,8 @@ def test_audit_failure_rolls_back_login_and_runtime_cannot_grant_roles(bootstrap
     with connect(fixture.runtime, autocommit=True) as db:
         assert count(db, "auth_sessions") == 0
         assert count(db, "audit_events") == 1
-        assert_denied(db, "INSERT INTO user_role_assignments SELECT * FROM user_role_assignments")
-        assert_denied(db, "UPDATE users SET state = 'DISABLED'")
+        assert_denied(db, "UPDATE user_role_assignments SET role_code = role_code")
+        assert_denied(db, "UPDATE users SET institution_id = institution_id")
         assert_denied(db, "UPDATE audit_events SET action = 'fake'")
 
 

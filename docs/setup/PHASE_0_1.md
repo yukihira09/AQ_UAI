@@ -1,6 +1,6 @@
 # AQ EduUAI — Phase 0 & Phase 1: beginner-friendly setup
 
-This guide records the Phase 0–1 baseline. For the current checkout, follow the [WP3 fresh setup or backup-first rollout](../phase2/wp3-operations.md#rollout-after-approval) for database credentials and startup.
+This guide records the Phase 0–1 baseline. For the current checkout, follow the [Phase 2 handoff](../phase2/phase2-handoff.md) for database credentials, startup, administration, and the backup-first upgrade.
 
 ## What is included?
 

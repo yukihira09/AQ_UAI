@@ -7,7 +7,6 @@ from fastapi import APIRouter, Depends, Request, Response
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
-from aq_uai_api.api.errors import DomainError, ErrorCode
 from aq_uai_api.auth import service
 from aq_uai_api.auth.security import (
     COOKIE_NAME,
@@ -68,12 +67,16 @@ def _current_session(
     return service.authenticate_session(db, request.cookies.get(COOKIE_NAME))
 
 
-def require_authenticated_user(
+def require_unrestricted_session(
     principal: Annotated[service.AuthenticatedSession, Depends(_current_session)],
+) -> service.AuthenticatedSession:
+    return service.require_unrestricted(principal)
+
+
+def require_authenticated_user(
+    principal: Annotated[service.AuthenticatedSession, Depends(require_unrestricted_session)],
 ) -> User:
     """Default dependency for future protected routes. Authorization is separate."""
-    if principal.must_change_password:
-        raise DomainError(ErrorCode.FORBIDDEN)
     return principal.user
 
 

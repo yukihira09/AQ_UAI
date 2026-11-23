@@ -96,6 +96,30 @@ def verify_configuration(command: list[str]) -> None:
             "Compose did not map three distinct credential sets as expected."
         )
 
+    for name in ("db", "api", "web"):
+        ports = services[name]["ports"]
+        if len(ports) != 1 or ports[0].get("host_ip") != "127.0.0.1":
+            raise ValueError(f"Expected one loopback-only port on {name}.")
+
+    web_mounts = {mount["target"]: mount for mount in services["web"]["volumes"]}
+    for source, target in (
+        ("apps/web", "/usr/share/nginx/html"),
+        ("apps/admin", "/usr/share/nginx/admin"),
+        ("infra/nginx/default.conf", "/etc/nginx/conf.d/default.conf"),
+    ):
+        mount = web_mounts.get(target, {})
+        if mount.get("source") != str(ROOT / source) or not mount.get("read_only"):
+            raise ValueError(f"Expected a read-only bind mount from {source}.")
+
+    for name, dependency, condition in (
+        ("provision", "db", "service_healthy"),
+        ("migrate", "provision", "service_completed_successfully"),
+        ("api", "migrate", "service_completed_successfully"),
+        ("web", "api", "service_healthy"),
+    ):
+        if services[name]["depends_on"][dependency]["condition"] != condition:
+            raise ValueError(f"Unexpected startup condition for {name}.")
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)

@@ -1,5 +1,6 @@
 """Database-backed authentication using the shared service transaction boundary."""
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from ipaddress import ip_address
@@ -42,14 +43,20 @@ def _key32(value: bytes) -> int:
     return int.from_bytes(value[:4], "big", signed=True)
 
 
-def database_lock(db: Session, namespace: int, key: int) -> None:
-    db.execute(select(func.pg_advisory_xact_lock(namespace, key)))
+def database_lock(db: Session, namespace: int, key: int, *, shared: bool = False) -> None:
+    lock = func.pg_advisory_xact_lock_shared if shared else func.pg_advisory_xact_lock
+    db.execute(select(lock(namespace, key)))
 
 
 def lock_account(db: Session, user_id: UUID) -> None:
     """WP5 must take this same lock before disabling an account and revoking its sessions."""
-    # Hash collisions only serialize two accounts; the database lookup still uses the full UUID.
-    database_lock(db, ACCOUNT_NAMESPACE, _key32(user_id.bytes[12:]))
+    lock_accounts(db, (user_id,))
+
+
+def lock_accounts(db: Session, user_ids: Iterable[UUID]) -> None:
+    """Sort the actual lock keys so multi-account operations use a stable order."""
+    for key in sorted({_key32(user_id.bytes[12:]) for user_id in user_ids}):
+        database_lock(db, ACCOUNT_NAMESPACE, key)
 
 
 def revoke_user_sessions(
@@ -154,10 +161,18 @@ def authenticate_session(db: Session, token: str | None) -> AuthenticatedSession
     digest = token_digest(token)
     if digest is None:
         raise DomainError(ErrorCode.AUTH_REQUIRED)
-    row = db.execute(_session_query(digest, datetime.now(UTC))).one_or_none()
+    row = db.execute(
+        _session_query(digest, datetime.now(UTC)).execution_options(populate_existing=True)
+    ).one_or_none()
     if row is None:
         raise DomainError(ErrorCode.AUTH_REQUIRED)
     return AuthenticatedSession(*row)
+
+
+def require_unrestricted(principal: AuthenticatedSession) -> AuthenticatedSession:
+    if principal.must_change_password:
+        raise DomainError(ErrorCode.FORBIDDEN)
+    return principal
 
 
 def login(

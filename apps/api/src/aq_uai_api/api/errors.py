@@ -14,6 +14,10 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 logger = logging.getLogger(__name__)
 REQUEST_ID_HEADER = "X-Request-ID"
+_PRIVATE_API_PATHS = tuple(
+    f"/api/v1/{resource}"
+    for resource in ("auth", "users", "units", "groups", "roles", "audit-events", "directory")
+)
 
 
 class ErrorCode(Enum):
@@ -71,8 +75,9 @@ class RequestContextMiddleware:
             if message["type"] == "http.response.start":
                 headers = MutableHeaders(scope=message)
                 headers[REQUEST_ID_HEADER] = request_id
-                if scope["path"].rstrip("/") == "/api/v1/auth" or scope["path"].startswith(
-                    "/api/v1/auth/"
+                if any(
+                    scope["path"] == path or scope["path"].startswith(path + "/")
+                    for path in _PRIVATE_API_PATHS
                 ):
                     headers["Cache-Control"] = "no-store"
                 response_started = True
