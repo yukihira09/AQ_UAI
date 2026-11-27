@@ -1,0 +1,74 @@
+name: Build AI Context Snapshot
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.png'
+      - 'docs/phase4/reports/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  pack-snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Generate clean codebase bundles
+        run: |
+          mkdir -p dist/context
+
+          pack_files() {
+            local out_file="$1"
+            shift
+            : > "$out_file"
+            find "$@" -type f \
+              ! -path '*/__pycache__/*' \
+              ! -path '*/.pytest_cache/*' \
+              ! -path '*/.ruff_cache/*' \
+              ! -path '*.egg-info/*' \
+              ! -path 'docs/phase4/reports/*' \
+              ! -name '*.png' \
+              ! -name '*.pyc' \
+              | sort | while IFS= read -r f; do
+                echo "==================== FILE: $f ====================" >> "$out_file"
+                cat "$f" >> "$out_file"
+                echo -e "\n" >> "$out_file"
+              done
+          }
+
+          # 1. Specs, FRDs, ADRs & Phase 1-4 Docs
+          pack_files dist/context/01_specs_adrs_docs.txt \
+            AGENTS.md CLAUDE.md README.md AQ-FRD-*.md docs
+
+          # 2. Backend API, Alembic Migrations & Domain Services (MDL, QTA, Auth, Directory)
+          pack_files dist/context/02_backend_api_migrations.txt \
+            apps/api/pyproject.toml apps/api/Dockerfile apps/api/README.md \
+            apps/api/alembic.ini apps/api/migrations apps/api/src
+
+          # 3. Admin UI, PO Visual Reference, Infra & Scripts
+          pack_files dist/context/03_admin_ui_infra_scripts.txt \
+            apps/admin apps/web infra scripts .env.example .github/workflows
+
+          # 4. Unit, Integration, Live & Browser E2E Tests
+          pack_files dist/context/04_tests_suite.txt \
+            apps/api/tests tests/browser
+
+          ls -lh dist/context/
+
+      - name: Publish rolling snapshot release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: latest-context
+          name: Latest AI Context Snapshot
+          body: |
+            Automated full-codebase snapshot for commit `${{ github.sha }}`.
+            Attach all 4 `.txt` files to Gemini for complete read access without truncation.
+          prerelease: true
+          overwrite_files: true
+          files: dist/context/*.txt
