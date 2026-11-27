@@ -1,4 +1,5 @@
 import { createClient, RequestError } from './api.mjs';
+import { tabs as mdlTabs } from './mdl.mjs';
 import { pageContent, sections } from './pages.mjs';
 import { actions, button, el, field, showError, submitForm } from './ui.mjs';
 
@@ -123,6 +124,13 @@ function currentRoute() {
   const hash = location.hash.slice(1);
   if (!hash) return ['home'];
   const [route, id, ...rest] = hash.split('/');
+  if (route === 'mdl') {
+    // #mdl, #mdl/<tab>, #mdl/providers/<uuid>, #mdl/models/<uuid>
+    const [detail, ...extra] = rest;
+    if (extra.length || (id !== undefined && !Object.hasOwn(mdlTabs, id)) ||
+      (detail !== undefined && (!['providers', 'models'].includes(id) || !uuid.test(detail)))) return [];
+    return [route, id, detail];
+  }
   if (!Object.hasOwn(sections, route) || rest.length || (id !== undefined &&
     (!['users', 'units', 'groups', 'audit'].includes(route) || !uuid.test(id)))) return [];
   return [route, id];
@@ -137,7 +145,7 @@ async function renderView(focus = false) {
   navigation = controller;
   const current = () => viewVersion === version && shell === activeShell;
   const read = (path, query) => client.request(path, { query, signal: controller.signal });
-  const [route, id] = currentRoute();
+  const [route, id, detail] = currentRoute();
   shell.sidebar.classList.remove('open');
   shell.menuToggle.setAttribute('aria-expanded', 'false');
   shell.session.open = false;
@@ -165,13 +173,13 @@ async function renderView(focus = false) {
     if (focus) shell.title.focus();
     const rendered = await pageContent({ caps, me, current, read, content: shell.content,
       write: (path, options) => client.request(path, options),
-      updated: async () => {
+      updated: async message => {
         if (!current()) return;
-        shell.notice.textContent = 'Đã lưu thay đổi.';
+        shell.notice.textContent = message ?? 'Đã lưu thay đổi.';
         shell.notice.hidden = false;
         await renderView();
       },
-    }, route, id);
+    }, route, id, detail);
     if (current()) shell.content.replaceChildren(...[rendered].flat(Infinity).filter(Boolean));
   } catch (error) {
     if (!current() || error.name === 'AbortError') return;

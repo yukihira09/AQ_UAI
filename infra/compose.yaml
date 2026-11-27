@@ -65,6 +65,16 @@ services:
       AQ_UAI_AUTH_ALLOW_HTTP_LOCAL: ${AQ_UAI_AUTH_ALLOW_HTTP_LOCAL:-true}
       AQ_UAI_AUTH_TRUSTED_PROXY_IP: ${AQ_UAI_AUTH_TRUSTED_PROXY_IP:-}
       AQ_UAI_AUTH_THROTTLE_KEY: ${AQ_UAI_AUTH_THROTTLE_KEY:?Set the authentication throttle key}
+      # MDL credential key ring (D14): api ONLY, never provision/migrate. Empty is allowed:
+      # the API still starts and MDL credential operations report "unavailable".
+      AQ_UAI_MDL_CREDENTIAL_KEYS: ${AQ_UAI_MDL_CREDENTIAL_KEYS:-}
+      AQ_UAI_MDL_CREDENTIAL_ACTIVE_KEY_ID: ${AQ_UAI_MDL_CREDENTIAL_ACTIVE_KEY_ID:-}
+      # MDL egress (M4/M5): host:port or CIDR:port entries INTERNAL providers may reach.
+      # Empty = none. Never list db, api, nginx or 169.254.0.0/16 (always refused anyway).
+      AQ_UAI_MDL_EGRESS_INTERNAL_ALLOWLIST: ${AQ_UAI_MDL_EGRESS_INTERNAL_ALLOWLIST:-}
+      # Optional PEM CA bundle path inside this container (mount it read-only) for
+      # INTERNAL https providers signed by a private CA. Empty = system store only.
+      AQ_UAI_MDL_EGRESS_INTERNAL_CA_FILE: ${AQ_UAI_MDL_EGRESS_INTERNAL_CA_FILE:-}
       AQ_UAI_DB_HOST: db
       AQ_UAI_DB_PORT: "5432"
       AQ_UAI_DB_NAME: ${POSTGRES_DB:?}

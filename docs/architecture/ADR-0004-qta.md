@@ -1,0 +1,43 @@
+# ADR-0004 · QTA monthly quotas by account group and kill-switch
+
+**Status:** Proposed overall. Six product/scope decisions (**PD-Q1..PD-Q6**) were recorded by the **Project Owner on 2026-11-26** for this standalone demo project following the independent review in [QTA_Q1_REVIEW.md](../phase4/QTA_Q1_REVIEW.md). Not signed off by a Tech Lead or institutional authority. Stages **Q0** (planning), **Q1** (initial access catalog & schema), and **Q1-R** (schema, provenance, and plan revision) are implemented in source; stages **Q2–Q6** (APIs, entitlements, kill-switch, monthly reset, Admin UI, and handoff) are planned. This ADR **stays Proposed** until Tech Lead / formal acceptance is recorded.
+**Date:** 2026-11-26 (Q1-R).
+**Scope:** QTA only ([FRD](../frd/AQ-FRD-UAI-QTA-001.md)). MDL is read-only and unmodified; CRT is out of scope (Phase 5).
+**Detail:** [architecture](../phase4/QTA_ARCHITECTURE_AND_DECISIONS.md) · [decisions](../phase4/QTA_OPEN_DECISIONS.md) · [plan](../phase4/QTA_IMPLEMENTATION_PLAN.md) · [traceability](../phase4/QTA_REQUIREMENTS_TRACEABILITY.md).
+
+## Context
+
+QTA lets an AI quota administrator record a school-wide monthly quota ceiling with a decision reference, synchronize system account groups from the directory, manage specialized AI groups, configure per-member monthly quotas for each `(group, model)` pair, look up a user's additive multi-group base entitlement, execute or simulate monthly refreshes with zero rollover, and suspend or restore an individual user's AI access without zeroing their balance. It must extend the Phase 2 identity, RBAC, directory, audit, and migration foundations ([ADR-0002](ADR-0002-phase2-shared-foundation.md)) and read the Phase 3 MDL model catalogue ([ADR-0003](ADR-0003-mdl.md)) read-only, without inventing token-to-credit conversion rates, commercial model pricing, or fabricated consumption deductions.
+
+## Decision (proposed)
+
+- **Module:** a `qta` package inside the existing modular monolith, exposed under `/api/v1/qta` and `#qta` in `apps/admin/`, with additive Alembic migrations (`0007_qta_access_catalog`, `0008_qta_schema`). One-way dependency: `qta/` reads `mdl_models` / `mdl_providers` read-only; `mdl/` never imports `qta/` and undergoes zero schema or code changes (`PD-Q2`).
+- **Permissions & roles:** `qta.read` (GLOBAL or exact-UNIT) and `qta.manage` (direct GLOBAL only, in `_CENTRAL_PERMISSIONS`). Two direct-only roles: `AI_QUOTA_ADMIN` (`qta.read`, `qta.manage`, GLOBAL only) and `AI_QUOTA_VIEWER` (`qta.read`, GLOBAL for Board or UNIT for Unit Heads). `FOUNDATION_ADMIN`, `AI_MODEL_ADMIN`, and `AI_SPECIALIST` groups confer zero QTA authority.
+- **Unit & institutional allocation (PO decision, `PD-Q1`):** every QTA amount uses one abstract unit, **"đơn vị hạn mức"** (never tokens or credits; no price or conversion). `Allocated(month)` sums the additive base entitlement of every `ACTIVE` user across all active models over enrolled active groups; Phase 5 CRT net grants will join through the same function. Reducing a monthly total below `Allocated(month)` fails with `409 QTA_BUDGET_BELOW_ALLOCATED` and `{allocated, deficit}`. Directory growth and quota edits are never blocked; over-allocation is surfaced as a warning.
+- **Append-only monthly budgets (`INV-18`, `PD-Q4`):** `qta_budget_revisions` is INSERT-only (`revision >= 1`, unique per `(institution_id, period_month, revision)`), requiring both `decision_number` and `decision_date`. The active total is the highest revision; earlier decisions are preserved in both `qta_budget_revisions` and `BudgetRevisionRecorded` audit payloads. New revisions are accepted only for the current or next month (`Asia/Ho_Chi_Minh`); past months are read-only; months without a revision display `"chưa ghi nhận"`.
+- **Group registry, sync & directory reuse (`FR-QTA-020/022`, `RULE-QTA-05`):** Phase 2 `account_groups` and `group_memberships` remain the single source of truth for group identity and live memberships. `qta_quota_groups` is the explicit QTA enrollment registry (empty before first sync), anchored by a composite FK `(institution_id, group_id, group_kind) -> account_groups(institution_id, id, kind)` (`uq_account_groups_institution_id_kind`) that structurally prevents `AUTHORIZATION` groups from ever holding quotas. Sync enrolls active `SYSTEM` groups (`origin='SYNC'`), marks inactive/gone `SYSTEM` groups `in_directory=false` without deleting rows, preserves `origin='SPECIALIST'` entries untouched, and appends `qta_group_sync_runs` (with `groups_added`, `groups_retired`). In Q2, `authorization/policy.py::require_group_management` accepts `qta.manage` or `directory.manage` for `AI_SPECIALIST`, and QTA specialist-group endpoints delegate writes to `directory.service` in the same transaction as registry enrollment — no parallel group writer.
+- **Usage versus entitlement:** QTA separates configured group quota, live additive `base_entitlement`, `actual_consumption` (`null`, `consumption_status: "NOT_INTEGRATED"`), and `remaining_quota` (`null`). No consumption table or synthetic usage deduction is built before an AI invocation gateway exists.
+- **Kill-switch & restoration (`PD-Q2`, `PD-Q3`):** `qta_suspensions` and `qta_suspension_restorations` are INSERT-only. Operator identity (`suspended_by`, `restored_by`, `actor_id`) comes strictly from the authenticated session; `ordered_by` is mandatory non-authoritative metadata. `expires_at` is optional (`NULL` = active until restored; if set, finite and strictly future; evaluated lazily). `PAID_EXTERNAL_ONLY` blocks all models of `EXTERNAL` providers and allows `INTERNAL` models. Neither suspend nor restore alters quota balances.
+- **Monthly reset (`PD-Q6`):** `Asia/Ho_Chi_Minh` month boundary (`AQ_UAI_INSTITUTION_TIMEZONE`), strict idempotency via `UNIQUE(institution_id, period_month)`, zero rollover across months, scheduled CLI (`python -m aq_uai_api.qta.reset`), and manual simulation restricted to the **current month only** so it never pre-empts the real `00:00` day-1 run. Active suspensions survive monthly resets.
+- **Database least privilege:** zero `DELETE` grant for `aq_uai_runtime` on all 8 QTA tables; 6 history/event tables (`qta_budget_revisions`, `qta_group_sync_runs`, `qta_suspensions`, `qta_suspension_restorations`, `qta_monthly_resets`, `qta_events`) are strictly INSERT-only; `qta_quota_groups` allows `UPDATE` only on `(in_directory, last_synced_at)`.
+
+## Consequences
+
+- **Positive:** zero parallel identity/directory stacks; zero edits to verified Phase 3 MDL; database-enforced append-only budgets and `AUTHORIZATION`-group exclusion; honest empty-before-sync behavior; no invented financial conversion or fake usage numbers.
+- **Costs:** `0008_qta_schema` adds one non-destructive composite `UNIQUE` constraint on `account_groups`; Q2 extends `require_group_management` in shared `authorization/policy.py`; Phase 4 uses a demo-scoped abstract unit (`PD-Q1`) that institutional deployment would later map to official accounting rules.
+- **Risks:** institutional accounting may eventually require per-model conversion prices (`FRD §6 Should`), free-tier external model exemptions, or historical end-of-month membership snapshots — each remains a clean additive change later without breaking QTA's core tables.
+
+## Alternatives considered
+
+- **Mutable `qta_monthly_budgets` row with `UPDATE`:** rejected in Q1-R (F2) because overwriting `total_limit` and `decision_number` violated `INV-18` / `RULE-QTA-04`.
+- **Reading `account_groups` directly without a QTA registry:** rejected in Q1-R (F3) because sync became cosmetic and `FR-QTA-001 AC2` / `FR-QTA-020 AC1` could not be demonstrated honestly.
+- **Adding `mdl_models.billing_tier` via migration `0009`:** rejected by `PD-Q2` (F6) to avoid altering the verified MDL module for a distinction the QTA FRD does not require.
+- **Duplicating `directory.service` group-creation code inside `qta/`:** rejected in Q1-R (F4) as a forbidden parallel implementation.
+
+## Approval
+
+| Date | Who | Scope | Kind |
+| --- | --- | --- | --- |
+| 2026-11-26 | Sole Project Owner, directly | `PD-Q1..PD-Q6` (abstract unit `"đơn vị hạn mức"` & allocation, `PAID_EXTERNAL_ONLY` = `EXTERNAL` providers, optional `expires_at`, required `decision_date`, immediate mid-month changes, current-month-only manual reset) in [QTA_OPEN_DECISIONS.md](../phase4/QTA_OPEN_DECISIONS.md) | Project Owner decision for this standalone demo project. **Not** Tech Lead or institutional sign-off |
+
+Everything else in this ADR remains **Proposed**. Do not infer formal acceptance from this entry.

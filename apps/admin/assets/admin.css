@@ -62,7 +62,8 @@ small, .hint { font-size: .86rem; }
 .topbar { min-height: 70px; border-bottom: 1px solid var(--line); background: var(--surface); padding: .7rem clamp(1rem, 3.3vw, 2.2rem); display: flex; justify-content: space-between; align-items: center; gap: .7rem; }
 .topbar-heading { min-width: 0; display: flex; align-items: center; gap: .75rem; }
 .menu-toggle { display: none !important; }
-.session { position: relative; min-width: 0; }
+.session { position: relative; min-width: 0; flex: none; }
+.topbar-heading > h1 { min-width: 0; }
 .session summary { cursor: pointer; display: flex; align-items: center; gap: .6rem; border-radius: .6rem; padding: .3rem; font-weight: 600; }
 .session summary::-webkit-details-marker { display: none; }
 .session summary::after { content: '▾'; color: var(--muted); }
@@ -145,3 +146,18 @@ dialog::backdrop { background: rgb(19 37 61 / 54%); }
   .facts { grid-template-columns: 1fr; gap: .2rem; }
   .facts dd { margin-bottom: .35rem; }
 }
+
+/* M6: AI provider & model configuration */
+.tabs { display: flex; flex-wrap: wrap; gap: .35rem; border-bottom: 1px solid var(--line); }
+.tabs a { padding: .55rem .8rem; border-radius: .5rem .5rem 0 0; font-weight: 650; text-decoration: none; color: var(--ink); }
+.tabs a:hover, .tabs a[aria-current] { color: var(--blue-dark); background: var(--blue-soft); box-shadow: inset 0 -3px 0 var(--blue); }
+.choice-group { border: 1px solid var(--line); border-radius: .5rem; padding: .5rem .75rem; margin: 0; }
+.choice-group legend { font-size: .92rem; font-weight: 650; padding: 0 .25rem; }
+.choice { display: flex; align-items: flex-start; gap: .4rem; font-weight: 500; }
+.choice input { margin-top: .3rem; }
+.cost-notice { display: grid; gap: .3rem; padding: .72rem .85rem; border: 1px solid #f0c36b; border-radius: .55rem; background: #fff7e3; color: #5d3d00; }
+.guidance > summary { color: var(--blue-dark); cursor: pointer; font-size: .9rem; }
+.guidance[open] { display: grid; gap: .4rem; }
+.issue-list { margin-top: .25rem; font-size: .86rem; color: #744900; }
+.change-list { font-size: .86rem; }
+.change-list li + li { margin-top: .15rem; }

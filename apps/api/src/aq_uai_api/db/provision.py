@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,6 +32,25 @@ LEGACY_TABLES = frozenset(
         "auth_sessions",
         "auth_throttle_buckets",
         "audit_events",
+        # M2 (0004_mdl_schema). A database restored or migrated by the bootstrap owner
+        # holds these too; provisioning must take them over like the tables above.
+        "mdl_providers",
+        "mdl_provider_credentials",
+        "mdl_provider_agreements",
+        "mdl_models",
+        "mdl_connection_tests",
+        "mdl_routing",
+        "mdl_routing_revisions",
+        "mdl_provider_agreement_withdrawals",  # M3 (0005)
+        # Q1-R (0008_qta_schema). Keep every application table provisionable after restore.
+        "qta_budget_revisions",
+        "qta_quota_groups",
+        "qta_group_model_quotas",
+        "qta_group_sync_runs",
+        "qta_suspensions",
+        "qta_suspension_restorations",
+        "qta_monthly_resets",
+        "qta_events",
     }
 )
 RUNTIME_READ_TABLES = (
@@ -48,6 +68,95 @@ RUNTIME_READ_TABLES = (
     "group_role_assignments",
     "audit_events",
 )
+
+
+# M2 (0004_mdl_schema). Least privilege for the runtime login:
+# - no DELETE on any MDL table (FR-MDL-012: no hard delete; history is append-only);
+# - agreements, withdrawals and routing revisions are INSERT-only (append-only history);
+# - immutable columns (institution_id, provider_type, provider_id, technical_id, ids,
+#   creation times, test snapshots) are absent from every UPDATE list;
+# - credentials: ciphertext, nonce and key ID only. The key never reaches PostgreSQL.
+MDL_RUNTIME_PRIVILEGES = {
+    "mdl_providers": (
+        "SELECT, INSERT (institution_id, name, provider_type, api_style, endpoint, auth_scheme, "
+        "auth_header_name), UPDATE (name, api_style, endpoint, auth_scheme, auth_header_name, "
+        "active, connection_version, updated_at)"
+    ),
+    "mdl_provider_credentials": (
+        "SELECT, INSERT (provider_id, institution_id, ciphertext, nonce, key_id, "
+        "credential_version, updated_by), UPDATE (ciphertext, nonce, key_id, "
+        "credential_version, updated_by, updated_at)"
+    ),
+    "mdl_provider_agreements": (
+        "SELECT, INSERT (institution_id, provider_id, provider_type, basis, document_number, "
+        "signed_on, recorded_by)"
+    ),
+    "mdl_models": (
+        "SELECT, INSERT (institution_id, provider_id, technical_id, display_name, supports_text, "
+        "supports_image, supports_voice, max_output_tokens, risk_level), UPDATE (display_name, "
+        "supports_text, supports_image, supports_voice, max_output_tokens, risk_level, active, "
+        "updated_at)"
+    ),
+    "mdl_connection_tests": (
+        "SELECT, INSERT (institution_id, model_id, connection_version, credential_version, "
+        "started_by), UPDATE (status, error_code, http_status_class, latency_ms, finished_at)"
+    ),
+    "mdl_routing": (
+        "SELECT, INSERT (institution_id, primary_model_id, fallback_model_id, revision, "
+        "updated_by), UPDATE (primary_model_id, fallback_model_id, revision, updated_by, "
+        "updated_at)"
+    ),
+    "mdl_provider_agreement_withdrawals": (
+        "SELECT, INSERT (agreement_id, institution_id, withdrawn_by)"
+    ),
+    "mdl_routing_revisions": (
+        "SELECT, INSERT (institution_id, revision, before_primary_model_id, "
+        "before_fallback_model_id, after_primary_model_id, after_fallback_model_id, "
+        "before_primary_name, before_fallback_name, after_primary_name, after_fallback_name, "
+        "decision_reference, changed_by)"
+    ),
+}
+# Q1-R (0008_qta_schema). Least privilege for the runtime login:
+# - no DELETE on any QTA table (FR-QTA-050 / RULE-QTA-04: append-only history);
+# - budget revisions, sync runs, suspensions, restorations, monthly resets and events are
+#   INSERT-only (no UPDATE, no DELETE);
+# - registry rows allow UPDATE only on sync-maintained columns (in_directory, last_synced_at);
+# - immutable identity columns are excluded from UPDATE on group quotas.
+QTA_RUNTIME_PRIVILEGES = {
+    "qta_budget_revisions": (
+        "SELECT, INSERT (institution_id, period_month, revision, total_limit, "
+        "decision_number, decision_date, recorded_by)"
+    ),
+    "qta_quota_groups": (
+        "SELECT, INSERT (institution_id, group_id, group_kind, origin, in_directory, "
+        "enrolled_by, last_synced_at), UPDATE (in_directory, last_synced_at)"
+    ),
+    "qta_group_model_quotas": (
+        "SELECT, INSERT (institution_id, group_id, model_id, enabled, monthly_limit, "
+        "warning_threshold_pct, updated_by), UPDATE (enabled, monthly_limit, "
+        "warning_threshold_pct, updated_by, updated_at)"
+    ),
+    "qta_group_sync_runs": (
+        "SELECT, INSERT (institution_id, system_group_count, active_member_count, "
+        "specialist_group_count, groups_added, groups_retired, synced_by)"
+    ),
+    "qta_suspensions": (
+        "SELECT, INSERT (institution_id, user_id, scope, reason, ordered_by, expires_at, "
+        "suspended_by)"
+    ),
+    "qta_suspension_restorations": (
+        "SELECT, INSERT (suspension_id, institution_id, restored_by, note)"
+    ),
+    "qta_monthly_resets": (
+        "SELECT, INSERT (institution_id, period_month, trigger_mode, triggered_by)"
+    ),
+    "qta_events": (
+        "SELECT, INSERT (institution_id, period_month, event_type, user_id, actor_id, summary)"
+    ),
+}
+# The credential key ring is for the api service only (D14). Database setup refuses to
+# run when it can see one, so a misconfigured Compose file fails loudly, not silently.
+API_ONLY_ENVIRONMENT = ("AQ_UAI_MDL_CREDENTIAL_KEYS", "AQ_UAI_MDL_CREDENTIAL_ACTIVE_KEY_ID")
 
 
 @dataclass(frozen=True)
@@ -99,6 +208,31 @@ def _ensure_role(connection: Connection, name: str, database: str, purpose: str,
             "NOREPLICATION NOBYPASSRLS PASSWORD {}"
         ).format(role, sql.Literal(verifier))
     )
+
+
+_PRIVILEGE_CLAUSE = re.compile(r"\s*([A-Z]+)\s*(?:\(([^)]*)\))?\s*(?:,|$)")
+
+
+def present_privileges(privileges: str, existing: set[str]) -> str:
+    """Keep only columns that exist now (M5 fix).
+
+    ``prepare`` runs before ``migrate``: on an older database a column added by a later
+    migration (for example ``decision_reference`` in 0006) does not exist yet, and a
+    column grant naming it would abort provisioning. The grant after migration (``migrate``
+    calls this again) then includes the new column. Clause order and spelling are kept.
+    """
+    clauses = []
+    for match in _PRIVILEGE_CLAUSE.finditer(privileges):
+        verb, names = match.group(1), match.group(2)
+        if names is None:
+            clauses.append(verb)
+            continue
+        kept = [name.strip() for name in names.split(",") if name.strip() in existing]
+        if kept:
+            clauses.append(f"{verb} ({', '.join(kept)})")
+    if not clauses:
+        raise ProvisioningError("No privilege applies to the current table definition.")
+    return ", ".join(clauses)
 
 
 def apply_runtime_privileges(connection: Connection, roles: DatabaseRoles) -> None:
@@ -170,11 +304,21 @@ def apply_runtime_privileges(connection: Connection, roles: DatabaseRoles) -> No
             "INSERT (institution_id, group_id, role_code, scope, unit_id), DELETE"
         ),
     }
-    for table, privileges in directory_writes.items():
+    columns: dict[str, set[str]] = {}
+    for table, column in connection.execute(
+        "SELECT table_name, column_name FROM information_schema.columns "
+        "WHERE table_schema = 'public'"
+    ):
+        columns.setdefault(table, set()).add(column)
+    for table, privileges in (
+        directory_writes | MDL_RUNTIME_PRIVILEGES | QTA_RUNTIME_PRIVILEGES
+    ).items():
         if table in present:
             connection.execute(
                 sql.SQL("GRANT {} ON TABLE {} TO {}").format(
-                    sql.SQL(privileges), sql.Identifier("public", table), runtime
+                    sql.SQL(present_privileges(privileges, columns[table])),
+                    sql.Identifier("public", table),
+                    runtime,
                 )
             )
 
@@ -282,6 +426,10 @@ def main() -> int:
     args = parser.parse_args()
     roles = DatabaseRoles()
     try:
+        if any(name in os.environ for name in API_ONLY_ENVIRONMENT):
+            raise ProvisioningError(
+                "The MDL credential key ring must be given to the api service only."
+            )
         settings = Settings()
         if args.operation == "prepare":
             migration_password = os.environ.get("AQ_UAI_MIGRATION_PASSWORD", "")

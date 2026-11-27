@@ -67,7 +67,7 @@ def finish_password_change(browser, current=TEMPORARY):
 @pytest.fixture
 def directory(bootstrapped, monkeypatch):
     db = bootstrapped
-    monkeypatch.setattr(service, "write_transaction", db.runtime_factory.begin)
+    monkeypatch.setattr(writes, "write_transaction", db.runtime_factory.begin)
     db.app.dependency_overrides[get_settings] = lambda: db.settings
     with db.owner_factory() as owner:
         profile = owner.get(User, db.user_id)
@@ -124,6 +124,9 @@ def test_user_and_unit_lifecycle_with_persisted_credentials_and_grants(directory
         "FOUNDATION_ADMIN",
         "DIRECTORY_READER",
         "UNIT_DIRECTORY_MANAGER",
+        "AI_MODEL_ADMIN",
+        "AI_QUOTA_ADMIN",
+        "AI_QUOTA_VIEWER",
     }
     alpha = create_unit(admin, "ALPHA")
     beta = create_unit(admin, "BETA")
@@ -697,7 +700,7 @@ def test_membership_does_not_mutate_group_created_after_account_lock_hint(direct
     db, admin = directory, directory.admin
     user = create_user(admin, db.main_unit, "new-member")
     group_id = uuid4()
-    resolve = service.resolve_write_authority
+    resolve = writes.resolve_write_authority
 
     def create_before_guard(*args, **kwargs):
         assert kwargs["related_account_ids"] == ()
@@ -715,7 +718,7 @@ def test_membership_does_not_mutate_group_created_after_account_lock_hint(direct
 
     member_path = f"/groups/{group_id}/members/{user['id']}"
     with monkeypatch.context() as patched:
-        patched.setattr(service, "resolve_write_authority", create_before_guard)
+        patched.setattr(writes, "resolve_write_authority", create_before_guard)
         expect(send(admin, "PUT", member_path), 404)
     assert expect(get(admin, f"/groups/{group_id}/members"), 200)["total"] == 0
     expect(send(admin, "PUT", member_path), 200)

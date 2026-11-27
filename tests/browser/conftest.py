@@ -7,7 +7,7 @@ import subprocess
 import sys
 import time
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from uuid import uuid4
 
@@ -175,6 +175,8 @@ class Stack:
     nginx_port: int
     api_port: int
     path: Path
+    # M6: extra API settings (MDL key ring, egress allowlist, test CA) for MDL checks.
+    api_env: dict = field(default_factory=dict)
 
     @property
     def admin(self):
@@ -192,6 +194,7 @@ class Stack:
             "AQ_UAI_AUTH_ALLOW_HTTP_LOCAL": "true",
             "AQ_UAI_AUTH_THROTTLE_KEY": "11" * 32,
             "AQ_UAI_AUTH_TRUSTED_PROXY_IP": "",
+            **self.api_env,
         }
         log = self.path / "api.log"
         with process(
@@ -272,3 +275,37 @@ def browser():
 def page(browser):
     with browser.new_context(locale="vi-VN") as context:
         yield context.new_page()
+
+
+def _fake_provider_module():
+    """The loopback HTTPS stand-in shared with the API integration tests (one copy)."""
+    import importlib.util
+
+    path = ROOT / "apps/api/tests/integration/fake_provider.py"
+    spec = importlib.util.spec_from_file_location("aq_browser_fake_provider", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+MDL_KEY = "NTxsr7S1n0GrMMsRwJ7c7c1nHnqSu7gR0sN2B9nZJ2s="  # synthetic, browser tests only
+
+
+@pytest.fixture
+def mdl_stack(provisioned_stack):
+    """The real stack plus an MDL-ready API: key ring, one allowed loopback port, test CA."""
+    module = _fake_provider_module()
+    pki = module.ProviderPki()
+    provider = module.LocalProvider(pki)
+    provisioned_stack.api_env = {
+        "AQ_UAI_MDL_CREDENTIAL_KEYS": f"b1:{MDL_KEY}",
+        "AQ_UAI_MDL_CREDENTIAL_ACTIVE_KEY_ID": "b1",
+        "AQ_UAI_MDL_EGRESS_INTERNAL_ALLOWLIST": provider.allowlist,
+        "AQ_UAI_MDL_EGRESS_INTERNAL_CA_FILE": str(pki.ca_file),
+    }
+    try:
+        with provisioned_stack.api(), provisioned_stack.proxy():
+            provisioned_stack.provider = provider
+            yield provisioned_stack
+    finally:
+        provider.close()

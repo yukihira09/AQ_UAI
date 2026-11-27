@@ -14,7 +14,7 @@ node --test scripts/test_sidebar_navigation.cjs
 for source in apps/web/shared/*.js apps/web/module*/*.js apps/admin/assets/*.mjs; do
   node --check "$source"
 done
-"$phase2_python" -m ruff check apps/api/src apps/api/tests apps/api/migrations/env.py scripts/verify_wp2_compose.py
+"$phase2_python" -m ruff check apps/api/src apps/api/tests apps/api/migrations/env.py scripts/verify_wp2_compose.py infra/demo-provider/server.py
 "$phase2_python" -m ruff check --config apps/api/pyproject.toml tests/browser
 if command -v docker >/dev/null && docker compose version >/dev/null 2>&1; then
   "$phase2_python" scripts/verify_wp2_compose.py --env-file .env.example --project-name aq-phase2-config-check

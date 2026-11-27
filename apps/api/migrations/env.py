@@ -9,6 +9,8 @@ from sqlalchemy import create_engine, pool
 from aq_uai_api.core.config import get_settings
 from aq_uai_api.db import identity, models  # noqa: F401 - register ORM tables
 from aq_uai_api.db.base import Base
+from aq_uai_api.mdl import models as mdl_models  # noqa: F401 - register MDL tables
+from aq_uai_api.qta import models as qta_models  # noqa: F401 - register QTA tables
 
 config = context.config
 if config.config_file_name is not None:

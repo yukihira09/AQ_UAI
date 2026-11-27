@@ -10,6 +10,8 @@ ROOT = Path(__file__).resolve().parents[1]
 DB_ENV = {
     f"AQ_UAI_DB_{suffix}" for suffix in ("HOST", "PORT", "NAME", "USER", "PASSWORD")
 }
+# M2: the MDL credential key ring is injected into the api service only (D14).
+MDL_KEY_ENV = {"AQ_UAI_MDL_CREDENTIAL_KEYS", "AQ_UAI_MDL_CREDENTIAL_ACTIVE_KEY_ID"}
 EXPECTED_ENV = {
     "db": {"POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD"},
     "provision": DB_ENV | {"AQ_UAI_MIGRATION_PASSWORD", "AQ_UAI_RUNTIME_PASSWORD"},
@@ -21,7 +23,10 @@ EXPECTED_ENV = {
         "AQ_UAI_AUTH_ALLOW_HTTP_LOCAL",
         "AQ_UAI_AUTH_TRUSTED_PROXY_IP",
         "AQ_UAI_AUTH_THROTTLE_KEY",
-    },
+    }
+    | MDL_KEY_ENV
+    # M4/M5: operator egress policy, api only.
+    | {"AQ_UAI_MDL_EGRESS_INTERNAL_ALLOWLIST", "AQ_UAI_MDL_EGRESS_INTERNAL_CA_FILE"},
 }
 
 LIVE_PROBE = """
@@ -73,6 +78,9 @@ def verify_configuration(command: list[str]) -> None:
         spec = services[service]
         if set(spec["environment"]) != keys or spec.get("env_file"):
             raise ValueError(f"Unexpected environment keys on {service}.")
+    for name, spec in services.items():
+        if name != "api" and MDL_KEY_ENV & set(spec.get("environment") or {}):
+            raise ValueError(f"The MDL key ring must not reach {name}.")
     env = {service: services[service]["environment"] for service in EXPECTED_ENV}
     if not (
         env["api"]["AQ_UAI_DB_USER"] == "aq_uai_runtime"

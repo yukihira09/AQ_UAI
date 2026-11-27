@@ -10,12 +10,26 @@ const messages = {
 };
 
 export class RequestError extends Error {
-  constructor(status, requestId, message, code) {
+  constructor(status, requestId, message, code, details) {
     super(message ?? messages[status] ?? 'Không thể xử lý yêu cầu.');
     this.status = status;
     this.requestId = requestId;
     this.code = code;
+    this.details = details;
   }
+}
+
+// Only the API's allowlisted detail keys, each a short list of fixed lowercase identifiers
+// (for example used_in: ["routing.primary"]). Anything else is ignored, never rendered.
+function safeDetails(details) {
+  const result = {};
+  for (const key of ['used_in', 'reasons']) {
+    const value = details?.[key];
+    if (Array.isArray(value) && value.length <= 48 && value.every(item => typeof item === 'string' && /^[a-z][a-z0-9_.-]{0,63}$/.test(item))) {
+      result[key] = value;
+    }
+  }
+  return Object.keys(result).length ? result : undefined;
 }
 
 export function createClient(onExpired) {
@@ -62,7 +76,7 @@ export function createClient(onExpired) {
           /^[a-f0-9-]{36}$/i.test(envelope.request_id) ? envelope.request_id : null;
         const code = typeof envelope?.code === 'string' && /^[A-Z_]{1,64}$/.test(envelope.code)
           ? envelope.code : undefined;
-        throw new RequestError(response.status, requestId ?? echoedId, message, code);
+        throw new RequestError(response.status, requestId ?? echoedId, message, code, safeDetails(envelope?.details));
       }
       if (response.status === 204) return undefined;
       try {

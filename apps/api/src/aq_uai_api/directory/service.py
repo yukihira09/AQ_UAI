@@ -2,7 +2,6 @@
 
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Literal
 from uuid import UUID
@@ -14,7 +13,7 @@ from sqlalchemy.orm import Session
 from aq_uai_api.api.errors import DomainError, ErrorCode
 from aq_uai_api.auth.security import hash_password
 from aq_uai_api.auth.service import revoke_user_sessions
-from aq_uai_api.auth.write import WriteProof, authenticate_write
+from aq_uai_api.auth.write import authenticate_write
 from aq_uai_api.authorization.policy import (
     ActorAuthority,
     GrantScope,
@@ -27,8 +26,8 @@ from aq_uai_api.authorization.policy import (
 from aq_uai_api.authorization.policy import (
     PermissionCode as P,
 )
-from aq_uai_api.authorization.writes import resolve_write_authority
-from aq_uai_api.core.config import Settings
+from aq_uai_api.authorization.writes import WriteContext, record
+from aq_uai_api.authorization.writes import protected as shared_protected
 from aq_uai_api.db import audit
 from aq_uai_api.db.identity import (
     AccountGroup,
@@ -39,15 +38,7 @@ from aq_uai_api.db.identity import (
     UserCredential,
     UserRoleAssignment,
 )
-from aq_uai_api.db.session import write_transaction
 from aq_uai_api.directory import queries, schemas
-
-
-@dataclass(frozen=True, repr=False)
-class WriteContext:
-    proof: WriteProof
-    settings: Settings
-    request_id: UUID
 
 
 @contextmanager
@@ -59,57 +50,40 @@ def protected(
     permission: P | None = None,
     membership_group_id: UUID | None = None,
 ) -> Iterator[tuple[Session, ActorAuthority]]:
-    with write_transaction() as db:
-        if membership_group_id is not None:
-            # The group's institution and kind are immutable. Read them only
-            # to choose the permission for the WP4 account lock hint. The
-            # service still checks the actual group and user under the locks.
-            current = authenticate_write(db, context.proof, context.settings)
-            initial_authority = resolve_effective_grants(db, current)
-            kind = db.scalar(
-                queries.group_query(initial_authority)
-                .with_only_columns(AccountGroup.kind)
-                .where(AccountGroup.id == membership_group_id)
-            )
-            if kind is not None:
-                permission = (
-                    P.AUTHORIZATION_MANAGE if kind == "AUTHORIZATION" else P.DIRECTORY_MANAGE
-                )
-        authority = resolve_write_authority(
-            db,
-            context.proof,
-            context.settings,
-            changes_authority=changes_authority,
-            related_account_ids=(user_id,)
-            if user_id is not None and permission is not None
-            else (),
-            related_account_permission=permission,
+    """Directory wrapper over the shared protected write with a group-kind lock hint."""
+    hinted_permission: P | None = None
+
+    def membership_hint(db: Session) -> P | None:
+        nonlocal hinted_permission
+        # The group's institution and kind are immutable. Read them only
+        # to choose the permission for the WP4 account lock hint. The
+        # service still checks the actual group and user under the locks.
+        current = authenticate_write(db, context.proof, context.settings)
+        initial_authority = resolve_effective_grants(db, current)
+        kind = db.scalar(
+            queries.group_query(initial_authority)
+            .with_only_columns(AccountGroup.kind)
+            .where(AccountGroup.id == membership_group_id)
         )
-        if membership_group_id is not None and permission is None:
+        if kind is not None:
+            hinted_permission = (
+                P.AUTHORIZATION_MANAGE if kind == "AUTHORIZATION" else P.DIRECTORY_MANAGE
+            )
+        return hinted_permission
+
+    with shared_protected(
+        context,
+        changes_authority=changes_authority,
+        user_id=user_id,
+        permission=permission,
+        permission_hint=membership_hint if membership_group_id is not None else None,
+    ) as (db, authority):
+        if membership_group_id is not None and permission is None and hinted_permission is None:
             # A concurrent create may make this UUID visible after the hint
             # read. This transaction did not coordinate with the target account.
             _require_group_administration(authority)
             raise DomainError(ErrorCode.NOT_FOUND)
         yield db, authority
-
-
-def record(
-    db: Session,
-    context: WriteContext,
-    authority: ActorAuthority,
-    action: audit.AuditAction,
-    target_id: UUID,
-    changes,
-) -> None:
-    audit.write_audit_event(
-        db,
-        action=action,
-        request_id=context.request_id,
-        institution_id=authority.institution_id,
-        actor_id=authority.actor_id,
-        target_id=target_id,
-        changes=changes,
-    )
 
 
 def _central(authority: ActorAuthority, permission: P = P.DIRECTORY_MANAGE) -> UUID:
@@ -408,21 +382,46 @@ def set_unit_active(context: WriteContext, unit_id: UUID, active: bool) -> schem
         return schemas.UnitOut.model_validate(unit)
 
 
+def create_group_in_tx(
+    db: Session,
+    authority: ActorAuthority,
+    context: WriteContext,
+    payload: schemas.CreateGroup,
+) -> AccountGroup:
+    require_group_management(authority, authority.institution_id, payload.kind)
+    group = AccountGroup(institution_id=authority.institution_id, **payload.model_dump())
+    db.add(group)
+    db.flush()
+    record(
+        db,
+        context,
+        authority,
+        audit.AuditAction.GROUP_CREATED,
+        group.id,
+        audit.GroupCreated(code=group.code, name=group.name, kind=group.kind),
+    )
+    return group
+
+
 def create_group(context: WriteContext, payload: schemas.CreateGroup) -> schemas.GroupOut:
     with protected(context, changes_authority=True) as (db, authority):
-        require_group_management(authority, authority.institution_id, payload.kind)
-        group = AccountGroup(institution_id=authority.institution_id, **payload.model_dump())
-        db.add(group)
-        db.flush()
-        record(
-            db,
-            context,
-            authority,
-            audit.AuditAction.GROUP_CREATED,
-            group.id,
-            audit.GroupCreated(code=group.code, name=group.name, kind=group.kind),
-        )
-        return schemas.GroupOut.model_validate(group)
+        return schemas.GroupOut.model_validate(create_group_in_tx(db, authority, context, payload))
+
+
+def update_group_in_tx(
+    db: Session,
+    authority: ActorAuthority,
+    context: WriteContext,
+    group: AccountGroup,
+    payload: schemas.GroupPatch,
+) -> AccountGroup:
+    require_group_management(authority, group.institution_id, group.kind)
+    if group.name != payload.name:
+        changes = audit.NameChange(before=group.name, after=payload.name)
+        group.name = payload.name
+        group.updated_at = datetime.now(UTC)
+        record(db, context, authority, audit.AuditAction.GROUP_UPDATED, group.id, changes)
+    return group
 
 
 def update_group(
@@ -430,24 +429,81 @@ def update_group(
 ) -> schemas.GroupOut:
     with protected(context, changes_authority=False) as (db, authority):
         group = _group(db, authority, group_id, lock=True)
-        if group.name != payload.name:
-            changes = audit.NameChange(before=group.name, after=payload.name)
-            group.name = payload.name
-            group.updated_at = datetime.now(UTC)
-            record(db, context, authority, audit.AuditAction.GROUP_UPDATED, group.id, changes)
-        return schemas.GroupOut.model_validate(group)
+        return schemas.GroupOut.model_validate(
+            update_group_in_tx(db, authority, context, group, payload)
+        )
+
+
+def set_group_active_in_tx(
+    db: Session,
+    authority: ActorAuthority,
+    context: WriteContext,
+    group: AccountGroup,
+    active: bool,
+) -> AccountGroup:
+    require_group_management(authority, group.institution_id, group.kind)
+    if group.active == active:
+        raise DomainError(ErrorCode.CONFLICT)
+    changes = audit.ActiveChange(before=group.active, after=active)
+    group.active = active
+    group.updated_at = datetime.now(UTC)
+    record(db, context, authority, audit.AuditAction.GROUP_STATE_CHANGED, group.id, changes)
+    return group
 
 
 def set_group_active(context: WriteContext, group_id: UUID, active: bool) -> schemas.GroupOut:
     with protected(context, changes_authority=True) as (db, authority):
         group = _group(db, authority, group_id)
-        if group.active == active:
-            raise DomainError(ErrorCode.CONFLICT)
-        changes = audit.ActiveChange(before=group.active, after=active)
-        group.active = active
-        group.updated_at = datetime.now(UTC)
-        record(db, context, authority, audit.AuditAction.GROUP_STATE_CHANGED, group.id, changes)
-        return schemas.GroupOut.model_validate(group)
+        return schemas.GroupOut.model_validate(
+            set_group_active_in_tx(db, authority, context, group, active)
+        )
+
+
+def set_membership_in_tx(
+    db: Session,
+    authority: ActorAuthority,
+    context: WriteContext,
+    group: AccountGroup,
+    user: User,
+    active: bool,
+) -> schemas.MemberOut | None:
+    require_group_management(authority, group.institution_id, group.kind)
+    if user.institution_id != authority.institution_id:
+        raise DomainError(ErrorCode.NOT_FOUND)
+    if active and not group.active:
+        raise DomainError(ErrorCode.CONFLICT)
+    row = db.scalar(
+        sa.select(GroupMembership).where(
+            GroupMembership.institution_id == authority.institution_id,
+            GroupMembership.group_id == group.id,
+            GroupMembership.user_id == user.id,
+        )
+    )
+    if row is None and not active:
+        return None
+    before = row.active if row is not None else None
+    if before != active:
+        if row is None:
+            row = GroupMembership(
+                institution_id=authority.institution_id,
+                group_id=group.id,
+                user_id=user.id,
+                active=active,
+            )
+            db.add(row)
+            db.flush()
+        else:
+            row.active = active
+            row.updated_at = datetime.now(UTC)
+        record(
+            db,
+            context,
+            authority,
+            audit.AuditAction.MEMBERSHIP_STATE_CHANGED,
+            group.id,
+            audit.MembershipChange(user_id=user.id, before=before, after=active),
+        )
+    return queries.member_out(row, user) if active else None
 
 
 def set_membership(
@@ -458,40 +514,7 @@ def set_membership(
     ) as (db, authority):
         group = _group(db, authority, group_id)
         user = _user(db, authority, user_id)
-        if active and not group.active:
-            raise DomainError(ErrorCode.CONFLICT)
-        row = db.scalar(
-            sa.select(GroupMembership).where(
-                GroupMembership.institution_id == authority.institution_id,
-                GroupMembership.group_id == group_id,
-                GroupMembership.user_id == user_id,
-            )
-        )
-        if row is None and not active:
-            return None
-        before = row.active if row is not None else None
-        if before != active:
-            if row is None:
-                row = GroupMembership(
-                    institution_id=authority.institution_id,
-                    group_id=group_id,
-                    user_id=user_id,
-                    active=active,
-                )
-                db.add(row)
-                db.flush()
-            else:
-                row.active = active
-                row.updated_at = datetime.now(UTC)
-            record(
-                db,
-                context,
-                authority,
-                audit.AuditAction.MEMBERSHIP_STATE_CHANGED,
-                group_id,
-                audit.MembershipChange(user_id=user_id, before=before, after=active),
-            )
-        return queries.member_out(row, user) if active else None
+        return set_membership_in_tx(db, authority, context, group, user, active)
 
 
 def _grant_audit(row: schemas.AssignmentOut) -> audit.AssignmentChange:

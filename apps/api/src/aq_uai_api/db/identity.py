@@ -95,6 +95,9 @@ class AccountGroup(UUIDPrimaryKey, ChangeTimestamps, Base):
     __tablename__ = "account_groups"
     __table_args__ = (
         sa.UniqueConstraint("institution_id", "id", name="uq_account_groups_institution_id"),
+        sa.UniqueConstraint(
+            "institution_id", "id", "kind", name="uq_account_groups_institution_id_kind"
+        ),
         sa.UniqueConstraint("institution_id", "code", name="uq_account_groups_institution_code"),
         sa.CheckConstraint(
             "kind IN ('SYSTEM', 'AUTHORIZATION', 'AI_SPECIALIST')", name="ck_account_groups_kind"
@@ -196,6 +199,14 @@ class UserRoleAssignment(UUIDPrimaryKey, Base):
             "role_code <> 'UNIT_DIRECTORY_MANAGER' OR scope = 'UNIT'",
             name="ck_user_role_assignments_manager_unit",
         ),
+        sa.CheckConstraint(
+            "role_code <> 'AI_MODEL_ADMIN' OR scope = 'GLOBAL'",
+            name="ck_user_role_assignments_mdl_admin_global",
+        ),
+        sa.CheckConstraint(
+            "role_code <> 'AI_QUOTA_ADMIN' OR scope = 'GLOBAL'",
+            name="ck_user_role_assignments_qta_admin_global",
+        ),
         sa.Index("ix_user_role_assignments_user", "user_id"),
         sa.Index("ix_user_role_assignments_institution_unit", "institution_id", "unit_id"),
     )
@@ -237,6 +248,15 @@ class GroupRoleAssignment(UUIDPrimaryKey, Base):
         sa.CheckConstraint(
             "role_code <> 'UNIT_DIRECTORY_MANAGER' OR scope = 'UNIT'",
             name="ck_group_role_assignments_manager_unit",
+        ),
+        sa.CheckConstraint(
+            "role_code <> 'AI_MODEL_ADMIN'", name="ck_group_role_assignments_no_mdl_admin"
+        ),
+        sa.CheckConstraint(
+            "role_code <> 'AI_QUOTA_ADMIN'", name="ck_group_role_assignments_no_qta_admin"
+        ),
+        sa.CheckConstraint(
+            "role_code <> 'AI_QUOTA_VIEWER'", name="ck_group_role_assignments_no_qta_viewer"
         ),
         sa.Index("ix_group_role_assignments_group", "group_id"),
         sa.Index("ix_group_role_assignments_institution_unit", "institution_id", "unit_id"),

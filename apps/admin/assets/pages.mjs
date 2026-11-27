@@ -1,4 +1,5 @@
 import { hasScope, permission } from './api.mjs';
+import { mdlPage } from './mdl.mjs';
 import { actions, badge, button, dateLabel, el, facts, field, formDialog, link, listing, panel, reference, showError } from './ui.mjs';
 
 const labels = {
@@ -18,11 +19,24 @@ const actionsLabel = {
   'role_assignment.removed': 'Thu hồi vai trò', 'auth.login_rejected': 'Đăng nhập bị từ chối',
   'auth.login_succeeded': 'Đăng nhập', 'auth.logout': 'Đăng xuất', 'auth.password_changed': 'Đổi mật khẩu',
   'auth.operator_reset': 'Khôi phục mật khẩu', 'auth.admin_bootstrapped': 'Khởi tạo quản trị viên',
+  'mdl.provider_created': 'Thêm nhà cung cấp AI', 'mdl.provider_updated': 'Cập nhật nhà cung cấp AI',
+  'mdl.provider_state_changed': 'Đổi trạng thái nhà cung cấp AI', 'mdl.provider_credential_rotated': 'Thay bí mật kết nối',
+  'mdl.agreement_recorded': 'Ghi nhận thỏa thuận dữ liệu', 'mdl.agreement_withdrawn': 'Thu hồi thỏa thuận dữ liệu',
+  'mdl.model_created': 'Thêm mô hình AI', 'mdl.model_updated': 'Cập nhật mô hình AI',
+  'mdl.model_state_changed': 'Đổi trạng thái mô hình AI', 'mdl.model_risk_changed': 'Đổi mức rủi ro mô hình',
+  'mdl.model_connection_tested': 'Thử kết nối mô hình AI', 'mdl.routing_changed': 'Đổi mô hình chính / dự phòng',
+  'mdl.credential_rewrapped': 'Mã hóa lại bí mật kết nối (xoay khóa)',
+  'qta.monthly_budget_set': 'Cập nhật tổng hạn mức tháng', 'qta.groups_synced': 'Đồng bộ nhóm tài khoản vào hạn mức AI',
+  'qta.group_quota_updated': 'Cập nhật hạn mức nhóm × mô hình', 'qta.user_suspended': 'Cắt / ngưng hạn mức cá nhân',
+  'qta.user_restored': 'Khôi phục hạn mức cá nhân', 'qta.monthly_reset_executed': 'Làm mới hạn mức đầu tháng',
+  'qta.monthly_reset_scheduled': 'Làm mới hạn mức đầu tháng (tự động)',
 };
 
 const permissions = {
   'directory.read': 'Xem danh bạ', 'directory.profile.update': 'Sửa tên hiển thị',
   'directory.manage': 'Quản lý danh bạ', 'authorization.manage': 'Quản lý phân quyền', 'audit.read': 'Xem nhật ký',
+  'mdl.read': 'Xem cấu hình mô hình AI', 'mdl.manage': 'Quản lý nhà cung cấp & mô hình AI',
+  'qta.read': 'Xem hạn mức AI theo nhóm', 'qta.manage': 'Quản lý hạn mức AI & cắt / khôi phục',
 };
 
 export const sections = {
@@ -32,6 +46,7 @@ export const sections = {
   groups: { title: 'Nhóm tài khoản', icon: '◫', visible: caps => permission(caps, 'directory.read') },
   roles: { title: 'Vai trò', icon: '◇', visible: caps => permission(caps, 'authorization.manage') },
   audit: { title: 'Nhật ký', icon: '≡', visible: caps => permission(caps, 'audit.read') },
+  mdl: { title: 'Cấu hình Nhà cung cấp & Mô hình AI', icon: '✦', visible: caps => permission(caps, 'mdl.read') },
 };
 
 const types = ['STAFF', 'STUDENT'];
@@ -238,7 +253,7 @@ function roles(context) {
 }
 
 function assignmentFields(context, catalog, group) {
-  const choices = catalog.items.map(role => role.code).filter(code => !group || code !== 'FOUNDATION_ADMIN');
+  const choices = catalog.items.map(role => role.code).filter(code => !group || !['FOUNDATION_ADMIN', 'AI_MODEL_ADMIN', 'AI_QUOTA_ADMIN', 'AI_QUOTA_VIEWER'].includes(code));
   const role = field({ name: 'role_code', label: 'Vai trò', required: true, options: choices.map(code => [code, code]) });
   const scopeField = field({ name: 'scope', label: 'Phạm vi', required: true, options: enumOptions(['GLOBAL', 'UNIT']) });
   const unit = unitSelect(context, 'unit_id', 'Đơn vị áp dụng');
@@ -248,7 +263,7 @@ function assignmentFields(context, catalog, group) {
   roleInput.value = choices[0] ?? '';
   function update() {
     const previous = scope.value;
-    const allowed = roleInput.value === 'FOUNDATION_ADMIN' ? ['GLOBAL']
+    const allowed = ['FOUNDATION_ADMIN', 'AI_MODEL_ADMIN', 'AI_QUOTA_ADMIN'].includes(roleInput.value) ? ['GLOBAL']
       : roleInput.value === 'UNIT_DIRECTORY_MANAGER' ? ['UNIT'] : ['GLOBAL', 'UNIT'];
     scope.replaceChildren(...enumOptions(allowed).map(([value, title]) => el('option', { value }, title)));
     scope.value = allowed.includes(previous) ? previous : allowed[0];
@@ -329,7 +344,7 @@ function home(context) {
   const visible = Object.entries(sections).filter(([key, section]) => key !== 'home' && section.visible(context.caps));
   const grants = Object.entries(context.caps.permissions).filter(([, scope]) => scope.institution_wide || scope.unit_ids.length);
   return [el('div', { class: 'welcome' }, el('h2', {}, `Xin chào, ${me.display_name}`),
-    el('p', {}, 'Quản lý danh bạ và quyền truy cập của trường.')),
+    el('p', {}, 'Quản lý danh bạ, quyền truy cập và cấu hình AI của trường theo quyền được cấp.')),
     el('div', { class: 'overview-grid' }, panel('Tài khoản của bạn', facts([
       ['Tên đăng nhập', me.username], ['ID trường', me.institution_id], ['Đơn vị chính', me.primary_unit_id],
     ])), panel('Phạm vi của bạn', grants.length ? facts(grants.map(([code, scope]) => [permissions[code],
@@ -341,7 +356,8 @@ function home(context) {
 const pages = { home, users, units, groups, roles, audit };
 const details = { users: userDetail, units: unitDetail, groups: groupDetail, audit: auditDetail };
 
-export async function pageContent(context, route, id) {
+export async function pageContent(context, route, id, detail) {
+  if (route === 'mdl') return mdlPage(context, id, detail);
   if (id && details[route]) return details[route](context, id);
   return pages[route](context);
 }

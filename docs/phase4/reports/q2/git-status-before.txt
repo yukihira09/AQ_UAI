@@ -1,0 +1,72 @@
+ M .env.example
+ M apps/admin/assets/admin.css
+ M apps/admin/assets/api.mjs
+ M apps/admin/assets/app.mjs
+ M apps/admin/assets/pages.mjs
+ M apps/admin/assets/ui.mjs
+ M apps/api/migrations/env.py
+ M apps/api/pyproject.toml
+ M apps/api/src/aq_uai_api/api/errors.py
+ M apps/api/src/aq_uai_api/authorization/policy.py
+ M apps/api/src/aq_uai_api/authorization/writes.py
+ M apps/api/src/aq_uai_api/core/config.py
+ M apps/api/src/aq_uai_api/db/audit.py
+ M apps/api/src/aq_uai_api/db/identity.py
+ M apps/api/src/aq_uai_api/db/provision.py
+ M apps/api/src/aq_uai_api/db/schema.py
+ M apps/api/src/aq_uai_api/directory/service.py
+ M apps/api/src/aq_uai_api/main.py
+ M apps/api/tests/integration/test_wp1_schema.py
+ M apps/api/tests/integration/test_wp5_directory.py
+ M docs/acceptance-matrix.md
+ M infra/compose.yaml
+ M scripts/dev-down.sh
+ M scripts/dev-up.sh
+ M scripts/verify_phase2.sh
+ M scripts/verify_wp2_compose.py
+ M tests/browser/conftest.py
+ M tests/browser/test_admin.py
+ M tests/browser/test_operations.py
+?? AQ-FRD-UAI-CRT-001.md
+?? AQ-FRD-UAI-MDL-001.md
+?? AQ-FRD-UAI-QTA-001.md
+?? CLAUDE.md
+?? apps/admin/assets/mdl.mjs
+?? apps/api/migrations/versions/0003_mdl_access_catalog.py
+?? apps/api/migrations/versions/0004_mdl_schema.py
+?? apps/api/migrations/versions/0005_mdl_agreement_withdrawals.py
+?? apps/api/migrations/versions/0006_mdl_routing_and_styles.py
+?? apps/api/migrations/versions/0007_qta_access_catalog.py
+?? apps/api/migrations/versions/0008_qta_schema.py
+?? apps/api/src/aq_uai_api/api/v1/mdl.py
+?? apps/api/src/aq_uai_api/db/mdl_rewrap.py
+?? apps/api/src/aq_uai_api/mdl/
+?? apps/api/src/aq_uai_api/qta/
+?? apps/api/tests/integration/fake_provider.py
+?? apps/api/tests/integration/test_m1_mdl_access.py
+?? apps/api/tests/integration/test_m2_mdl_schema.py
+?? apps/api/tests/integration/test_m3_mdl_api.py
+?? apps/api/tests/integration/test_m4_connection_tests.py
+?? apps/api/tests/integration/test_m5_routing.py
+?? apps/api/tests/integration/test_m6_quota_isolation.py
+?? apps/api/tests/integration/test_m7_history.py
+?? apps/api/tests/integration/test_q1_qta_schema.py
+?? apps/api/tests/live/
+?? apps/api/tests/unit/test_demo_provider.py
+?? apps/api/tests/unit/test_m1_contracts.py
+?? apps/api/tests/unit/test_m2_credentials.py
+?? apps/api/tests/unit/test_m3_contracts.py
+?? apps/api/tests/unit/test_m4_egress.py
+?? apps/api/tests/unit/test_m5_contracts.py
+?? apps/api/tests/unit/test_q1_contracts.py
+?? docs/PROJECT_CONTEXT.md
+?? docs/architecture/ADR-0003-mdl.md
+?? docs/architecture/ADR-0004-qta.md
+?? docs/phase2/local-deployment-note.md
+?? docs/phase3/
+?? docs/phase4/
+?? infra/compose.demo-provider.yaml
+?? infra/demo-provider/
+?? pics/
+?? tests/browser/test_mdl.py
+?? tests/browser/test_mdl_operations.py

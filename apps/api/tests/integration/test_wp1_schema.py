@@ -25,7 +25,8 @@ pytestmark = [
 ALEMBIC_INI = Path(__file__).resolve().parents[2] / "alembic.ini"
 PHASE1 = "0001_phase1_metadata"
 WP1 = "0002_identity_foundation"
-CATALOG = {
+HEAD = "0008_qta_schema"
+WP1_CATALOG = {
     "FOUNDATION_ADMIN": {
         "directory.read",
         "directory.profile.update",
@@ -35,6 +36,13 @@ CATALOG = {
     },
     "DIRECTORY_READER": {"directory.read"},
     "UNIT_DIRECTORY_MANAGER": {"directory.read", "directory.profile.update"},
+}
+# M1 adds AI_MODEL_ADMIN; Q1 adds AI_QUOTA_ADMIN and AI_QUOTA_VIEWER.
+# FOUNDATION_ADMIN and the WP1 roles must not change.
+CATALOG = WP1_CATALOG | {
+    "AI_MODEL_ADMIN": {"mdl.read", "mdl.manage"},
+    "AI_QUOTA_ADMIN": {"qta.read", "qta.manage"},
+    "AI_QUOTA_VIEWER": {"qta.read"},
 }
 
 
@@ -87,7 +95,7 @@ def current_revision(connection):
 
 def test_clean_database_reaches_wp1_and_matches_orm(clean_head):
     with clean_head.connect() as connection:
-        assert current_revision(connection) == WP1
+        assert current_revision(connection) == HEAD
     alembic(clean_head, "check")
 
 
@@ -101,12 +109,12 @@ def test_populated_phase1_upgrade_preserves_all_metadata(disposable_database):
 
     alembic(engine, "upgrade", "head")
     with engine.connect() as connection:
-        assert current_revision(connection) == WP1
+        assert current_revision(connection) == HEAD
         role_ids = connection.execute(sa.text("SELECT id FROM roles ORDER BY code")).all()
 
     alembic(engine, "upgrade", "head")
     with engine.connect() as connection:
-        assert current_revision(connection) == WP1
+        assert current_revision(connection) == HEAD
         assert (
             dict(connection.execute(sa.text("SELECT key, value FROM app_metadata")).all()) == before
         )
@@ -229,6 +237,13 @@ def sample(clean_head, tables):
         ("user_role_assignments", {"scope": "GLOBAL"}, "23514"),
         ("user_role_assignments", {"unit_id": None}, "23514"),
         ("user_role_assignments", {"role_code": "FOUNDATION_ADMIN"}, "23514"),
+        ("user_role_assignments", {"role_code": "AI_MODEL_ADMIN"}, "23514"),
+        (
+            "group_role_assignments",
+            {"role_code": "AI_MODEL_ADMIN", "scope": "GLOBAL", "unit_id": None},
+            "23514",
+        ),
+        ("group_role_assignments", {"role_code": "AI_MODEL_ADMIN"}, "23514"),
         (
             "group_role_assignments",
             {"role_code": "FOUNDATION_ADMIN", "scope": "GLOBAL", "unit_id": None},
@@ -356,3 +371,84 @@ def test_audit_actor_reference_preserves_historical_identity(sample, tables):
     with pytest.raises(IntegrityError) as error, connection.begin_nested():
         connection.execute(tables["users"].delete().where(tables["users"].c.id == ids["user"]))
     assert error.value.orig.sqlstate == "23503"
+
+
+def test_mdl_admin_is_accepted_only_as_a_direct_global_grant(sample, tables):
+    connection, ids = sample
+    connection.execute(
+        tables["user_role_assignments"]
+        .insert()
+        .values(
+            institution_id=ids["a"],
+            user_id=ids["user"],
+            role_code="AI_MODEL_ADMIN",
+            scope="GLOBAL",
+            unit_id=None,
+        )
+    )
+
+
+def test_upgrade_from_wp1_database_adds_catalog_and_keeps_existing_data(disposable_database):
+    engine = disposable_database()
+    alembic(engine, "upgrade", WP1)
+    institution_id, user_id, unit_id = uuid4(), uuid4(), uuid4()
+    with engine.begin() as connection:
+        assert current_revision(connection) == WP1
+        assert set(connection.scalars(sa.text("SELECT code FROM roles"))) == set(WP1_CATALOG)
+        connection.execute(
+            sa.text("INSERT INTO institutions (id, code, name) VALUES (:i, 'OFFICE', 'Office')"),
+            {"i": institution_id},
+        )
+        connection.execute(
+            sa.text(
+                "INSERT INTO units (id, institution_id, code, name) VALUES (:u, :i, 'main', 'Main')"
+            ),
+            {"u": unit_id, "i": institution_id},
+        )
+        connection.execute(
+            sa.text(
+                "INSERT INTO users (id, institution_id, primary_unit_id, username, display_name,"
+                " code_type, institutional_code) VALUES (:id, :i, :u, 'ada', 'Ada', 'STAFF', '1')"
+            ),
+            {"id": user_id, "i": institution_id, "u": unit_id},
+        )
+        connection.execute(
+            sa.text(
+                "INSERT INTO user_role_assignments (institution_id, user_id, role_code, scope)"
+                " VALUES (:i, :id, 'FOUNDATION_ADMIN', 'GLOBAL')"
+            ),
+            {"id": user_id, "i": institution_id},
+        )
+
+    def snapshot():
+        with engine.connect() as connection:
+            return (
+                connection.execute(sa.text("SELECT id, code FROM roles ORDER BY code")).all(),
+                connection.execute(
+                    sa.text("SELECT role_code, permission_code FROM role_permissions ORDER BY 1, 2")
+                ).all(),
+            )
+
+    alembic(engine, "upgrade", "head")
+    alembic(engine, "check")
+    first = snapshot()
+    alembic(engine, "upgrade", "head")
+    alembic(engine, "check")
+    assert snapshot() == first
+    with engine.connect() as connection:
+        assert current_revision(connection) == HEAD
+        grants = {}
+        for role, permission in connection.execute(
+            sa.text("SELECT role_code, permission_code FROM role_permissions")
+        ):
+            grants.setdefault(role, set()).add(permission)
+        assert grants == CATALOG
+        assert grants["FOUNDATION_ADMIN"] == WP1_CATALOG["FOUNDATION_ADMIN"]
+        assert (
+            connection.scalar(
+                sa.text("SELECT count(*) FROM user_role_assignments WHERE user_id = :id"),
+                {"id": user_id},
+            )
+            == 1
+        )
+        assert connection.scalar(sa.text("SELECT count(*) FROM audit_events")) == 0

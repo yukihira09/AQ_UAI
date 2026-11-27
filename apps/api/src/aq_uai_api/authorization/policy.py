@@ -31,6 +31,10 @@ class PermissionCode(StrEnum):
     DIRECTORY_MANAGE = "directory.manage"
     AUTHORIZATION_MANAGE = "authorization.manage"
     AUDIT_READ = "audit.read"
+    MDL_READ = "mdl.read"
+    MDL_MANAGE = "mdl.manage"
+    QTA_READ = "qta.read"
+    QTA_MANAGE = "qta.manage"
 
 
 class GrantScope(StrEnum):
@@ -51,11 +55,20 @@ _ROLE_SCOPES = {
     ("DIRECTORY_READER", GrantSubject.GROUP): {GrantScope.GLOBAL, GrantScope.UNIT},
     ("UNIT_DIRECTORY_MANAGER", GrantSubject.USER): {GrantScope.UNIT},
     ("UNIT_DIRECTORY_MANAGER", GrantSubject.GROUP): {GrantScope.UNIT},
+    # MDL authority is direct and institution-wide only (D7): no group row is valid.
+    ("AI_MODEL_ADMIN", GrantSubject.USER): {GrantScope.GLOBAL},
+    # QTA authority (QD1): AI_QUOTA_ADMIN is direct GLOBAL only; AI_QUOTA_VIEWER is direct
+    # GLOBAL (Board) or exact-UNIT (Unit Head lookup). Neither may be group-inherited.
+    ("AI_QUOTA_ADMIN", GrantSubject.USER): {GrantScope.GLOBAL},
+    ("AI_QUOTA_VIEWER", GrantSubject.USER): {GrantScope.GLOBAL, GrantScope.UNIT},
 }
 _CENTRAL_PERMISSIONS = {
     PermissionCode.DIRECTORY_MANAGE,
     PermissionCode.AUTHORIZATION_MANAGE,
     PermissionCode.AUDIT_READ,
+    PermissionCode.MDL_READ,
+    PermissionCode.MDL_MANAGE,
+    PermissionCode.QTA_MANAGE,
 }
 
 
@@ -278,12 +291,17 @@ def require_group_management(
 ) -> None:
     """Use the group's persisted kind, or the validated kind of a new group."""
     if group_kind == "AUTHORIZATION":
-        permission = PermissionCode.AUTHORIZATION_MANAGE
-    elif group_kind in {"SYSTEM", "AI_SPECIALIST"}:
-        permission = PermissionCode.DIRECTORY_MANAGE
+        authority.require_institution(PermissionCode.AUTHORIZATION_MANAGE, institution_id)
+    elif group_kind == "SYSTEM":
+        authority.require_institution(PermissionCode.DIRECTORY_MANAGE, institution_id)
+    elif group_kind == "AI_SPECIALIST":
+        if not (
+            authority.scope_for(PermissionCode.DIRECTORY_MANAGE).allows_institution(institution_id)
+            or authority.scope_for(PermissionCode.QTA_MANAGE).allows_institution(institution_id)
+        ):
+            raise DomainError(ErrorCode.FORBIDDEN)
     else:
         raise DomainError(ErrorCode.VALIDATION_FAILED)
-    authority.require_institution(permission, institution_id)
 
 
 def validate_role_assignment(

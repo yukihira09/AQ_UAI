@@ -245,6 +245,10 @@ def test_account_unit_workflows_and_conflicts(page, stack):
     expect(page.get_by_role("link", name="Tạ Anh")).to_be_visible()
     capture(page, "05-users")
     page.get_by_role("link", name="Nguyễn Minh Ánh").click()
+    # Wait for the detail view before checking its status badge. Checking at once raced the
+    # navigation: the list's status-filter <option> and row badge carry the same text
+    # (strict-mode failure, pre-existing since 2c909e3).
+    expect(page.get_by_role("heading", name="Nguyễn Minh Ánh")).to_be_visible()
     expect(page.get_by_text("Chờ kích hoạt", exact=True)).to_be_visible()
     dialog = open_dialog(page, "Kích hoạt tài khoản")
     dialog.get_by_label("Mật khẩu tạm thời").fill(TEMPORARY)

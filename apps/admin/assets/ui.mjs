@@ -92,6 +92,7 @@ export function submitForm(form, submit, errorBox, onSubmit, conflict) {
       delete payload.new_password;
       delete payload.confirmation;
       delete payload.temporary_password;
+      delete payload.secret;
       form.querySelectorAll('input[type="password"]').forEach(input => { input.value = ''; });
       form.removeAttribute('aria-busy');
       submit.disabled = false;
@@ -109,12 +110,14 @@ export function formDialog(context, { title, description, fields = [], submit = 
   dialog.append(form);
   dialog.addEventListener('close', () => dialog.remove());
   dialog.addEventListener('cancel', event => { if (form.hasAttribute('aria-busy')) event.preventDefault(); });
-  submitForm(form, submitButton, error, async values => {
+  // ``save`` receives the form too (multi-value fields such as checkboxes) and may return
+  // a confirmation message to show instead of the generic "saved" notice.
+  submitForm(form, submitButton, error, async (values, submitted) => {
     cancel.disabled = true;
     try {
-      await save(values);
+      const message = await save(values, submitted);
       dialog.close();
-      if (context.current()) await context.updated();
+      if (context.current()) await context.updated(typeof message === 'string' ? message : undefined);
     } finally {
       cancel.disabled = false;
     }

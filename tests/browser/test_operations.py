@@ -17,7 +17,7 @@ from psycopg import sql
 from .conftest import ROOT, TEMPORARY, Stack, connect, free_port
 from .test_admin import admin_session, create_named, login, section, write_api
 
-HEAD = "0002_identity_foundation"
+HEAD = "0008_qta_schema"
 TABLES = (
     "app_metadata",
     "institutions",

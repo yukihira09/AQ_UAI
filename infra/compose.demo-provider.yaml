@@ -1,0 +1,45 @@
+# Opt-in SYNTHETIC AI provider for demos and tests (MDL decision D15). Not a real vendor.
+# Use together with the main file, from the repository root:
+#   bash scripts/dev-up.sh --demo-provider
+# or: docker compose --env-file .env -f infra/compose.yaml -f infra/compose.demo-provider.yaml up --build -d
+# Needs in .env: AQ_DEMO_PROVIDER_API_KEY (>= 16 characters; the key you type into the admin UI)
+# and the MDL credential key ring (AQ_UAI_MDL_CREDENTIAL_KEYS / _ACTIVE_KEY_ID).
+# In the admin UI register: Nội bộ, https://demo-provider:8443/v1, Bearer token = that key;
+# model technical IDs: demo-chat, demo-chat-mini (AQ_DEMO_PROVIDER_MODELS).
+services:
+  demo-provider:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    # Root only to write the PUBLIC CA certificate into the shared volume; no ports published,
+    # reachable only on the Compose network. Private keys never leave this container.
+    user: "0:0"
+    command: ["python", "/srv/demo-provider/server.py"]
+    environment:
+      AQ_DEMO_PROVIDER_API_KEY: ${AQ_DEMO_PROVIDER_API_KEY:?Set AQ_DEMO_PROVIDER_API_KEY (16+ characters) in .env for the synthetic provider}
+      AQ_DEMO_PROVIDER_MODELS: ${AQ_DEMO_PROVIDER_MODELS:-demo-chat,demo-chat-mini}
+      AQ_DEMO_PROVIDER_HOSTNAMES: demo-provider
+      AQ_DEMO_PROVIDER_CA_DIR: /run/demo-provider-ca
+    volumes:
+      - ./demo-provider/server.py:/srv/demo-provider/server.py:ro
+      - demo_provider_ca:/run/demo-provider-ca
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os, sys; sys.exit(0 if os.path.exists('/run/demo-provider-ca/ca.pem') else 1)"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  api:
+    environment:
+      # The demo provider is the only internal destination while this file is used.
+      AQ_UAI_MDL_EGRESS_INTERNAL_ALLOWLIST: demo-provider:8443
+      AQ_UAI_MDL_EGRESS_INTERNAL_CA_FILE: /run/demo-provider-ca/ca.pem
+    volumes:
+      - demo_provider_ca:/run/demo-provider-ca:ro
+    depends_on:
+      demo-provider:
+        condition: service_healthy
+
+volumes:
+  demo_provider_ca:
