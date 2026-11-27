@@ -419,7 +419,8 @@ def test_quota_admin_cannot_touch_system_or_authorization_groups(qta):
         qta_send(db.qta_admin, "DELETE", f"/groups/{gid}/members/{db.member_id}", None, 403)
 
     # Also verify qta.manage cannot create SYSTEM or AUTHORIZATION groups through Phase 2 /groups route.
-    for kind in ("SYSTEM", "AUTHORIZATION"):
+    # AI_SPECIALIST too: quota admins create specialist groups only via /qta/groups.
+    for kind in ("SYSTEM", "AUTHORIZATION", "AI_SPECIALIST"):
         expect(
             send(db.qta_admin, "POST", "/groups", {"code": f"TRY_{kind}", "name": "Nope", "kind": kind}),
             403,

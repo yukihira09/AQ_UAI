@@ -1,0 +1,42 @@
+38a39
+> ae743f8d8c024d55ab9c9b984bc078cbd6841dd03e12130a157fb75ff5a811bb  apps/api/src/aq_uai_api/api/v1/qta.py
+47c48
+< 7b15e89486125719745fcb365f75ca140422399c679c9d5a76bd5a64656ca89d  apps/api/src/aq_uai_api/authorization/policy.py
+---
+> ec8edb420de5174531e87b33b3bd94ba410be111ffb7662ba60f4c737409c7af  apps/api/src/aq_uai_api/authorization/policy.py
+63,64c64,65
+< e87c3b555b055b2e97df6bdd3cdba3601429b598325d103ac5986248a307d287  apps/api/src/aq_uai_api/directory/service.py
+< 8ef9ae30b66626c3fc4c4e4a50c23c5c1b86e08d77aaf6836fea6c45e073d475  apps/api/src/aq_uai_api/main.py
+---
+> 1535fffe075fd8b0837f28b74c344cadf62d495bee309425d17cc50c745485f9  apps/api/src/aq_uai_api/directory/service.py
+> 87dbc0d2c1aa36e219b2feb9b6ea4d28019459e33d7254c5f803deb314aa7e35  apps/api/src/aq_uai_api/main.py
+81a83,85
+> ef65adb2fd9d2851d547f39f3c6d11fa0198b44c39cdf3d703047bd60d695e37  apps/api/src/aq_uai_api/qta/queries.py
+> ece1a1df50f73ddf9f82f2325e70d73386748fd22ecd2a20724918a9217e4bb6  apps/api/src/aq_uai_api/qta/schemas.py
+> e3d3da7d50fe422a068ab8e6f36598ad4766e18a50171e1ce5fb6eff52c504fc  apps/api/src/aq_uai_api/qta/service.py
+92a97
+> 1aaa1ee4aa788d43fd2d763b217b45ead1604f2be30ebb88bb2e01305f1c5bb5  apps/api/tests/integration/test_q2_qta_groups.py
+107a113
+> a222b561c5cfc7c794f4ab5747505ad03b7659e62af81bd9e6001be16a3ef601  apps/api/tests/unit/test_q2_contracts.py
+128,129c134,135
+< e3747867ac71b648fe862908c880457dc2119558b5c2b201b3270d1e7deac244  docs/PROJECT_CONTEXT.md
+< ea849f18ceefb5176bdacf044c5f1c7b903278f4de52e4f70ac67c53b18cdfda  docs/acceptance-matrix.md
+---
+> 0f80c45fb6877d52fc5208c39ffcce03f885af56f21078e051b3284701afc541  docs/PROJECT_CONTEXT.md
+> 0b0a349ac5086a6fff27f559258449918e497ea41ef70fe95919bb8e63bffd43  docs/acceptance-matrix.md
+162c168
+< 90e8ce1eb1a8b879c0efe4a99edab07a3c6568b1c790a3998deffc110b06abf8  docs/phase4/QTA_IMPLEMENTATION_PLAN.md
+---
+> 21224e94f22db9c359cb44061eabd5c934ed2d8a1d0ceffe255afdf1f77c6efe  docs/phase4/QTA_IMPLEMENTATION_PLAN.md
+166c172,180
+< ce72bd514155cda18add53752ef110516201ba1441e0b6eef548bf7d038a3205  docs/phase4/QTA_REQUIREMENTS_TRACEABILITY.md
+---
+> 20cf96f5e248f8ec562f20e734abcfe3f418edcbce394655c3a7d77916bc7352  docs/phase4/QTA_REQUIREMENTS_TRACEABILITY.md
+> 4fdea3408b88e820c48ae4cb9bb7b927d850a54d412769c1f86656863008281d  docs/phase4/reports/QTA_Q2_REPORT.md
+> 8c970c956544c5e32a81a4d75e4486b53f746b6dde1d69212097809df23d0874  docs/phase4/reports/q2/baseline-gate.log
+> 840fcfc616a2335a057e3bf0c0efbd75cb58e70062cb06d30964d0026acc89d4  docs/phase4/reports/q2/final-gate.log
+> 7203b45e37eb4d14b197a94eeeab8b88ab897ad262a9a25df19609bf392b3f2b  docs/phase4/reports/q2/focused-tests.log
+> 06b1d6a5a041d93abba0418308930db967f359ddf3ae2449d998c16ffcb7877c  docs/phase4/reports/q2/git-status-after.txt
+> ea56070e74437c448df247dbdb8846b38cb50afc29dd0725ecc6f327ffbd016d  docs/phase4/reports/q2/git-status-before.txt
+> f8fc5a7abddb868231f3787024c9c2739a57091488e471f0962c679771544128  docs/phase4/reports/q2/hashes-before.txt
+> cc1df0d494a3b3398164050af8ee92ded054396a14deadec01b035638930c2d1  docs/phase4/reports/q2/mutation-proof.log

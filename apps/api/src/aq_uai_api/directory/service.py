@@ -405,6 +405,9 @@ def create_group_in_tx(
 
 def create_group(context: WriteContext, payload: schemas.CreateGroup) -> schemas.GroupOut:
     with protected(context, changes_authority=True) as (db, authority):
+        # Phase 2 /groups stays a directory/authorization surface; qta.manage
+        # creates AI_SPECIALIST groups only through /qta/groups (enrolled).
+        _require_group_administration(authority)
         return schemas.GroupOut.model_validate(create_group_in_tx(db, authority, context, payload))
 
 

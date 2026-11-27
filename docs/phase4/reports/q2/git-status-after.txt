@@ -1,0 +1,7 @@
+ M CLAUDE.md
+ M docs/PROJECT_CONTEXT.md
+ M docs/acceptance-matrix.md
+ M docs/phase4/QTA_IMPLEMENTATION_PLAN.md
+ M docs/phase4/QTA_REQUIREMENTS_TRACEABILITY.md
+?? docs/phase4/reports/QTA_Q2_REPORT.md
+?? docs/phase4/reports/q2/git-status-after.txt

@@ -90,6 +90,13 @@ Q0 docs ─▶ Q1 schema/RBAC ─▶ Q1-R revision ─▶ Q2 registry/sync/quota
 - **Exclusions:** Entitlement calculation, personal lookup, school monthly budget revisions, kill-switch, monthly reset, Admin UI (Q3–Q5).
 - **Gate:** `verify_phase2.sh` (static checks, Ruff, `alembic check`, full API suite including new Q2 tests, browser suite).
 
+### Q2 completion (2026-11-27)
+
+**Status: implemented, awaiting review.** Full evidence and verification report: [QTA_Q2_REPORT.md](reports/QTA_Q2_REPORT.md) (logs & hash manifest under `docs/phase4/reports/q2/`).
+
+- **Delivered:** `require_group_management` updated for `AI_SPECIALIST` (`qta.manage` OR `directory.manage`); `directory/service.py` refactored minimally into `*_in_tx` inner functions reused by QTA; new `qta/{schemas,queries,service}.py` and `api/v1/qta.py` (13 operations across 10 paths under `/api/v1/qta`, registered in `main.py`); `test_q2_contracts.py` (16 unit cases) and `test_q2_qta_groups.py` (14 PostgreSQL integration tests); 3 required mutation proofs passed with byte-identical post-restore hashes. Zero migrations added (head stays `0008_qta_schema`), zero `mdl/` or `apps/web/` changes, zero existing tests edited. (`core/config.py` timezone setting deferred to Q3 per `QTA_Q2_PROMPT.md`.)
+- **Verification (full `scripts/verify_phase2.sh` gate, `docs/phase4/reports/q2/final-gate.log`, exit 0):** static checks PASS, `alembic check` clean, **API 525 passed, 1 skipped** (+30 over baseline 495), **browser 16 passed**. No `FR-QTA-*` requirement is formally accepted yet (Admin UI arrives in Q5).
+
 ---
 
 ## Q3 — Entitlement computation, additive lookup & append-only school monthly budgets

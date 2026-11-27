@@ -8,13 +8,13 @@ Read these before changing anything; link to them rather than duplicating their 
 - Canonical FRDs: `docs/frd/` (root-level `AQ-FRD-UAI-*.md` files are untracked duplicates; ignore them).
 - Phase 3 MDL (implemented & technically verified, M1–M7):
   - FRD: [docs/frd/AQ-FRD-UAI-MDL-001.md](docs/frd/AQ-FRD-UAI-MDL-001.md) · Plan: [docs/phase3/MDL_IMPLEMENTATION_PLAN.md](docs/phase3/MDL_IMPLEMENTATION_PLAN.md) · Handoff: [docs/phase3/mdl-handoff.md](docs/phase3/mdl-handoff.md) · ADR: [docs/architecture/ADR-0003-mdl.md](docs/architecture/ADR-0003-mdl.md)
-- **Current work: QTA (Phase 4, Module 2 — Q0, Q1, and Q1-R completed; Q2 next upon authorization).**
+- **Current work: QTA (Phase 4, Module 2 — Q0–Q2 implemented & verified, awaiting review; Q3 next upon authorization).**
   - FRD: [docs/frd/AQ-FRD-UAI-QTA-001.md](docs/frd/AQ-FRD-UAI-QTA-001.md) · ADR: [docs/architecture/ADR-0004-qta.md](docs/architecture/ADR-0004-qta.md)
   - Implementation plan: [docs/phase4/QTA_IMPLEMENTATION_PLAN.md](docs/phase4/QTA_IMPLEMENTATION_PLAN.md)
   - Open decisions & PO decisions (`PD-Q1..PD-Q6`): [docs/phase4/QTA_OPEN_DECISIONS.md](docs/phase4/QTA_OPEN_DECISIONS.md)
   - Architecture: [docs/phase4/QTA_ARCHITECTURE_AND_DECISIONS.md](docs/phase4/QTA_ARCHITECTURE_AND_DECISIONS.md)
   - Traceability: [docs/phase4/QTA_REQUIREMENTS_TRACEABILITY.md](docs/phase4/QTA_REQUIREMENTS_TRACEABILITY.md)
-  - Q1 review brief: [docs/phase4/QTA_Q1_REVIEW.md](docs/phase4/QTA_Q1_REVIEW.md)
+  - Q1 review brief: [docs/phase4/QTA_Q1_REVIEW.md](docs/phase4/QTA_Q1_REVIEW.md) · Q2 report: [docs/phase4/reports/QTA_Q2_REPORT.md](docs/phase4/reports/QTA_Q2_REPORT.md)
 
 ## Working rules
 
