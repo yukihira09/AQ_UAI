@@ -1,5 +1,6 @@
 import { hasScope, permission } from './api.mjs';
 import { mdlPage } from './mdl.mjs';
+import { qtaPage } from './qta.mjs';
 import { actions, badge, button, dateLabel, el, facts, field, formDialog, link, listing, panel, reference, showError } from './ui.mjs';
 
 const labels = {
@@ -47,6 +48,7 @@ export const sections = {
   roles: { title: 'Vai trò', icon: '◇', visible: caps => permission(caps, 'authorization.manage') },
   audit: { title: 'Nhật ký', icon: '≡', visible: caps => permission(caps, 'audit.read') },
   mdl: { title: 'Cấu hình Nhà cung cấp & Mô hình AI', icon: '✦', visible: caps => permission(caps, 'mdl.read') },
+  qta: { title: 'Hạn mức AI theo Nhóm tài khoản', icon: '◧', visible: caps => hasScope(caps, 'qta.read') },
 };
 
 const types = ['STAFF', 'STUDENT'];
@@ -358,6 +360,7 @@ const details = { users: userDetail, units: unitDetail, groups: groupDetail, aud
 
 export async function pageContent(context, route, id, detail) {
   if (route === 'mdl') return mdlPage(context, id, detail);
+  if (route === 'qta') return qtaPage(context, id, detail);
   if (id && details[route]) return details[route](context, id);
   return pages[route](context);
 }

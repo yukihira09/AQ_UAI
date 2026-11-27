@@ -160,6 +160,16 @@ Q0 docs ─▶ Q1 schema/RBAC ─▶ Q1-R revision ─▶ Q2 registry/sync/quota
 - **Exclusions:** `apps/web/` (frozen prototype), `mdl.mjs` (unchanged per `PD-Q2`).
 - **Gate:** `verify_phase2.sh` (static checks, `node --check`, Ruff, `alembic check`, full API + Playwright browser suites including `test_qta.py`).
 
+### Q5 completion (2026-11-27)
+
+**Status: implemented, awaiting review.** Full 11-section report, screenshots, and evidence: [QTA_Q5_REPORT.md](reports/QTA_Q5_REPORT.md) (logs, screenshots & SHA256 manifests under `docs/phase4/reports/q5/`).
+
+- **Delivered:**
+  - Carry-overs **C5–C7**: C5 identifier-only whole-word/camelCase/snake_case OpenAPI check + semantics unit test in `apps/api/tests/unit/test_q2_contracts.py`; C6 (`sum(contributes) == base_entitlement` across overlapping, disabled-rule, inactive-group & disabled-user cases) and C7 (real PostgreSQL `aq_uai_runtime` `check_ai_access` for `USER_NOT_FOUND`, `USER_NOT_ACTIVE`, `NO_ENTITLEMENT`) in `apps/api/tests/integration/test_q5_carryover.py`.
+  - Admin UI (`#qta`, following reviewer rules **R10–R16**): `apps/admin/assets/api.mjs` (allowlisted non-negative safe integers `allocated` and `deficit` in `safeDetails`), `apps/admin/assets/app.mjs` (`#qta[/<tab>[/<uuid>]]` routing), `apps/admin/assets/pages.mjs` (flat sidebar entry `"Hạn mức AI theo Nhóm tài khoản"` gated on `hasScope(caps, 'qta.read')`, no sidebar regrouping per R10), `apps/admin/assets/admin.css` (append-only responsive QTA styles, zero horizontal scroll at 375 px), and new `apps/admin/assets/qta.mjs` (school monthly budget header with revision history & deficit alerts, 3 tabs `Nhóm & Hạn mức` / `Tra cứu cá nhân & tạm ngưng` / `Lịch sử & Làm mới tháng`, group detail `#qta/groups/<uuid>`, UNIT-scoped viewer lookup-only single tab with zero 403s, `"đơn vị hạn mức"` + `"Chưa tích hợp đo tiêu thụ thực tế"` everywhere, zero `innerHTML`).
+  - Browser verification: 4 Playwright tests in `tests/browser/test_qta.py` + 5 screenshots under `docs/phase4/reports/q5/screenshots/`; all 5 required mutation proofs passed with byte-identical post-restore SHA256 hashes. Zero backend source (`apps/api/src/`), migration, `mdl.mjs`, or `apps/web/` edits.
+- **Verification (full `scripts/verify_phase2.sh` gate, `docs/phase4/reports/q5/final-gate.log`, exit 0):** static checks PASS, `alembic check` clean, **API 581 passed, 1 skipped** (+3 over Q4 baseline 578), **browser 20 passed** (+4 over Q4 baseline 16). No `FR-QTA-*` requirement is formally accepted yet (Q6 cross-module proof & handoff await separate authorization).
+
 ---
 
 ## Q6 — Full verification, cross-module MDL isolation proof & Phase 4 handoff

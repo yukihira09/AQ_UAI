@@ -2,7 +2,6 @@
 
 import ast
 import importlib.util
-import json
 import re
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -22,9 +21,107 @@ from aq_uai_api.main import create_app
 from aq_uai_api.qta import schemas
 
 SRC_ROOT = Path(__file__).resolve().parents[2] / "src" / "aq_uai_api"
-FORBIDDEN_FIELD = re.compile(
-    r"period|semester|cycle|price|token|credit|consumption", re.IGNORECASE
+FORBIDDEN_WORDS = frozenset(
+    {
+        "period",
+        "semester",
+        "cycle",
+        "price",
+        "cost",
+        "token",
+        "tokens",
+        "credit",
+        "credits",
+        "consumption",
+        "conversion",
+        "exam",
+        "project",
+    }
 )
+FORBIDDEN_ADJACENT_PAIRS = frozenset({("hoc", "ky"), ("de", "tai"), ("dot", "thi")})
+ALLOWED_RESPONSE_PROPS = frozenset({"actual_consumption", "consumption_status"})
+_CAMEL_TOKEN = re.compile(r"[A-Z]+(?=[A-Z][a-z]|\d|$)|[A-Z]?[a-z]+|\d+")
+
+
+def _split_identifier(name: str) -> list[str]:
+    """Split an identifier on non-alphanumeric separators and camelCase boundaries."""
+    tokens: list[str] = []
+    for chunk in re.split(r"[^A-Za-z0-9]+", name):
+        if not chunk:
+            continue
+        tokens.extend(tok.lower() for tok in _CAMEL_TOKEN.findall(chunk))
+    return tokens
+
+
+def _is_forbidden_identifier(name: str) -> bool:
+    tokens = _split_identifier(name)
+    if any(tok in FORBIDDEN_WORDS for tok in tokens):
+        return True
+    return any((tokens[i], tokens[i + 1]) in FORBIDDEN_ADJACENT_PAIRS for i in range(len(tokens) - 1))
+
+
+def _collect_refs(node: object) -> set[str]:
+    """Collect component schema names referenced via ``$ref`` without inspecting prose keys."""
+    refs: set[str] = set()
+    if isinstance(node, dict):
+        ref = node.get("$ref")
+        if isinstance(ref, str) and ref.startswith("#/components/schemas/"):
+            refs.add(ref.removeprefix("#/components/schemas/"))
+        for key, value in node.items():
+            if key in {"description", "title", "summary"}:
+                continue
+            refs.update(_collect_refs(value))
+    elif isinstance(node, list):
+        for item in node:
+            refs.update(_collect_refs(item))
+    return refs
+
+
+def _collect_enum_values(node: object) -> list[str]:
+    """Collect string ``enum`` / ``const`` values without inspecting prose keys."""
+    values: list[str] = []
+    if isinstance(node, dict):
+        if isinstance(node.get("enum"), list):
+            values.extend(v for v in node["enum"] if isinstance(v, str))
+        if isinstance(node.get("const"), str):
+            values.append(node["const"])
+        for key, value in node.items():
+            if key in {"description", "title", "summary"}:
+                continue
+            values.extend(_collect_enum_values(value))
+    elif isinstance(node, list):
+        for item in node:
+            values.extend(_collect_enum_values(item))
+    return values
+
+
+def _expand_refs(seed: set[str], all_schemas: dict[str, dict]) -> set[str]:
+    seen: set[str] = set()
+    queue = list(seed)
+    while queue:
+        name = queue.pop()
+        if name in seen or name not in all_schemas:
+            continue
+        seen.add(name)
+        queue.extend(_collect_refs(all_schemas[name]) - seen)
+    return seen
+
+
+def _schema_identifier_violations(
+    name: str, schema: dict, *, is_response: bool
+) -> list[tuple[str, str, str]]:
+    """Return forbidden property-name or enum-value violations for one OpenAPI schema."""
+    violations: list[tuple[str, str, str]] = []
+    allowed = ALLOWED_RESPONSE_PROPS if is_response else frozenset()
+    for prop in schema.get("properties", {}):
+        if prop in allowed:
+            continue
+        if _is_forbidden_identifier(prop):
+            violations.append((name, "property", prop))
+    for enum_val in _collect_enum_values(schema):
+        if _is_forbidden_identifier(enum_val):
+            violations.append((name, "enum", enum_val))
+    return violations
 
 
 def _authority(institution_id: UUID, permissions: tuple[PermissionCode, ...]) -> ActorAuthority:
@@ -122,41 +219,84 @@ def test_qta_openapi_routes_and_no_sync_run_mutation(openapi):
     assert paths["/api/v1/qta/groups/sync-runs"] == {"get"}
 
 
-def test_qta_openapi_has_no_forbidden_fields_and_rejects_unknown_inputs(openapi):
-    # R4: request bodies and query/path parameters stay fully strict; response schemas
-    # may contain only the two explicit non-integrated consumption fields from architecture §2.3.
-    allowed_response_props = {"actual_consumption", "consumption_status"}
-    qta_schemas = {
-        name: schema
-        for name, schema in openapi["components"]["schemas"].items()
-        if name in dir(schemas)
+def test_forbidden_identifier_check_semantics():
+    """C5: identifier-segment check avoids substring false positives while catching real leaks."""
+    assert _split_identifier("lifecycle_status") == ["lifecycle", "status"]
+    assert not _is_forbidden_identifier("lifecycle_status")
+    assert _is_forbidden_identifier("semester_id")
+    assert _is_forbidden_identifier("hoc_ky")
+    assert _is_forbidden_identifier("hocKy")
+    assert _is_forbidden_identifier("de_tai")
+    assert _is_forbidden_identifier("dot-thi")
+    assert _is_forbidden_identifier("consumption_status")
+
+    sample_schema = {
+        "type": "object",
+        "description": "Prose mentioning period, semester, cycle, token, credit, price, hoc ky.",
+        "properties": {
+            "lifecycle_status": {"type": "string"},
+            "actual_consumption": {"type": "null"},
+            "consumption_status": {"type": "string", "enum": ["NOT_INTEGRATED"]},
+        },
     }
-    assert qta_schemas
-    for name, schema in qta_schemas.items():
-        model = getattr(schemas, name, None)
-        is_output = isinstance(model, type) and issubclass(model, schemas.Output)
-        props = schema.get("properties", {})
-        if is_output:
-            bad = [
-                key
-                for key in props
-                if FORBIDDEN_FIELD.search(key) and key not in allowed_response_props
-            ]
-            assert not bad, (name, bad)
-            scrubbed = {
-                **schema,
-                "properties": {k: v for k, v in props.items() if k not in allowed_response_props},
-                "required": [
-                    k for k in schema.get("required", []) if k not in allowed_response_props
-                ],
-            }
-            assert not FORBIDDEN_FIELD.search(json.dumps(scrubbed)), name
-        else:
-            assert not [key for key in props if FORBIDDEN_FIELD.search(key)], (name, list(props))
-            assert not FORBIDDEN_FIELD.search(json.dumps(schema)), name
-    for path, operations in openapi["paths"].items():
-        if "/qta" in path:
-            assert not FORBIDDEN_FIELD.search(json.dumps(operations)), path
+    assert _schema_identifier_violations("SampleOut", sample_schema, is_response=True) == []
+    assert [
+        (kind, ident)
+        for _, kind, ident in _schema_identifier_violations("SampleIn", sample_schema, is_response=False)
+    ] == [("property", "actual_consumption"), ("property", "consumption_status")]
+
+
+def test_qta_openapi_has_no_forbidden_fields_and_rejects_unknown_inputs(openapi):
+    # C5 / R4: inspect identifiers only (path segments, parameter names, enum values, and
+    # reachable schema properties; never prose description/title/summary). Request schemas,
+    # query/path parameters, and enum values stay strictly free of forbidden terms; response
+    # schemas allow only actual_consumption and consumption_status from architecture §2.3.
+    all_schemas = openapi["components"]["schemas"]
+    request_roots: set[str] = set()
+    response_roots: set[str] = set()
+    violations: list[tuple[str, str, str]] = []
+
+    for path, path_item in openapi["paths"].items():
+        if "/qta" not in path:
+            continue
+        for segment in path.split("/"):
+            cleaned = segment.strip("{}")
+            if cleaned and _is_forbidden_identifier(cleaned):
+                violations.append((path, "path_segment", cleaned))
+        path_params = path_item.get("parameters", [])
+        for method, operation in path_item.items():
+            if not isinstance(operation, dict) or method == "parameters":
+                continue
+            for param in [*path_params, *operation.get("parameters", [])]:
+                param_name = param.get("name", "")
+                if _is_forbidden_identifier(param_name):
+                    violations.append((f"{method.upper()} {path}", "parameter", param_name))
+                for enum_val in _collect_enum_values(param.get("schema", {})):
+                    if _is_forbidden_identifier(enum_val):
+                        violations.append((f"{method.upper()} {path}", "param_enum", enum_val))
+                request_roots.update(_collect_refs(param))
+            if "requestBody" in operation:
+                request_roots.update(_collect_refs(operation["requestBody"]))
+            if "responses" in operation:
+                response_roots.update(_collect_refs(operation["responses"]))
+
+    request_schemas = _expand_refs(request_roots, all_schemas)
+    response_schemas = _expand_refs(response_roots, all_schemas)
+    # Also include every QTA schema exported from aq_uai_api.qta.schemas.
+    for name in all_schemas:
+        if name in dir(schemas):
+            model = getattr(schemas, name, None)
+            if isinstance(model, type) and issubclass(model, schemas.Output):
+                response_schemas.add(name)
+            else:
+                request_schemas.add(name)
+
+    assert request_schemas and response_schemas
+    for name in sorted(request_schemas):
+        violations.extend(_schema_identifier_violations(name, all_schemas[name], is_response=False))
+    for name in sorted(response_schemas - request_schemas):
+        violations.extend(_schema_identifier_violations(name, all_schemas[name], is_response=True))
+    assert not violations, violations
 
     for model, valid_data in (
         (schemas.CreateSpecialistGroup, {"code": "AI_LAB", "name": "AI Lab"}),

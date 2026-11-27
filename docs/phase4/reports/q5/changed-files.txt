@@ -1,0 +1,76 @@
+--- docs/phase4/reports/q5/hashes-before.txt	2026-11-27 14:57:17.400736878 +0700
++++ docs/phase4/reports/q5/hashes-after.txt	2026-11-27 16:14:32.480655803 +0700
+@@ -7,13 +7,14 @@
+ 726f6256dc703ddd93145038c3c05a5ca72eefa6aec6b3c38c6d2267f5ee6571  AQ-FRD-UAI-CRT-001.md
+ ea08b9d5c5bddff0fc83423f3a8f526c466a40d04332976d583698f6fc569162  AQ-FRD-UAI-MDL-001.md
+ fa16f130c533ee31698bfb87026fc8be900a0ccf6c8f363134bdb31777394d98  AQ-FRD-UAI-QTA-001.md
+-83628fbdcfc8ac4b0e9cb83b4fd236daf73a8e6215d6756f5fb6d950f6abc08c  CLAUDE.md
++230e164a7b0d7c012c1a6dbf9e7a0eefdb3883b8d43052ef1942276f42c93aa6  CLAUDE.md
+ a33fc2365e4a72c4cd7df5641ca3f9caba19c4a45899a4baa63ade92157f3ba7  README.md
+-8fd6f07f8355de3155f106aecd98e20bb756d0425b5311d2f14f4cce43e8c436  apps/admin/assets/admin.css
+-bfa5b42d031822f9e4a17a6372598f4cfb4d25e44e97ce175175402948695496  apps/admin/assets/api.mjs
+-5f0a96a9dd44c1f7b25ad72f6b4dfa40bb81267b0b7a6b4565a9439becdc2760  apps/admin/assets/app.mjs
++9d672a0e423ece07a1afd3c297d7dcdaddd16e9fccf0ae50151c23ea079c11ee  apps/admin/assets/admin.css
++6bfe7907555b00e7b93614f357efc22e8ebb32a711cffaef32ecb31b4115949e  apps/admin/assets/api.mjs
++411944fdb94d4427606a1d680865c4c3ff4f8e5cad6310003b04e1c5ec67c0ff  apps/admin/assets/app.mjs
+ bd05fe7ed4ebf4d2055f865e16dafd49151d22517387e77845d82f6c57070740  apps/admin/assets/mdl.mjs
+-9387604cdd245b17dfa8f800cf2ff3bcde06a426fea59a46ae2cb45379fd8fcf  apps/admin/assets/pages.mjs
++42c9f376b306b8a6c4b178908a66f2cf1da88370e1595cc662cb97c1b85bb658  apps/admin/assets/pages.mjs
++55aa163c6e55a2d4dd36299cfa0b8d684235612242801b3f7187915ed11f4a59  apps/admin/assets/qta.mjs
+ f46d9183837c0916e77fda661a3e47c5fee125b77e480312630c14ec12a07abf  apps/admin/assets/ui.mjs
+ 4b3a1febd0681eb78a41675e5702e35170602573e52bbd236763b8e680f0abea  apps/admin/index.html
+ 1d43a32ca016552ee7598dacc884b9e020036cd37bceea0a4688d5762e5ee0fb  apps/api/Dockerfile
+@@ -103,6 +104,7 @@
+ a7ab759d99b1826cf9d673ca49c15e228dbfbc0816f84f08895e2d704aa9f8f4  apps/api/tests/integration/test_q3_qta_lookup_budgets.py
+ 22970ca7b8e561f0947e7df5c7da0a47177c1b065a4b4d0082636b81ee1046f0  apps/api/tests/integration/test_q4_carryover.py
+ dd8b3073f6e795a6020db87ef214e7f6eeda735bde2c4478f259a12db7f865b0  apps/api/tests/integration/test_q4_qta_killswitch_reset.py
++78a39f9a9504d1afce0ab7c04025b5f364dda34e1b9367086d3f4c81612ccda5  apps/api/tests/integration/test_q5_carryover.py
+ 7f9f71e4c062b6fa13013e98e602a6c0602f162979a5c84fcfbfa450545dd7d9  apps/api/tests/integration/test_wp1_schema.py
+ e79992c477fa8490c873d8f3a87cf527aeb370a8379d007c6b886c8cdd6d64de  apps/api/tests/integration/test_wp2_database.py
+ a496b666c9e0a26d08c76f94d7eb30bf1890b94ef75d958bdd380e5103820e1d  apps/api/tests/integration/test_wp3_auth.py
+@@ -118,7 +120,7 @@
+ 6d471d418336733f3ef18b49a553b6d85ea66b7976f95fcec51ed16ff2758cba  apps/api/tests/unit/test_m4_egress.py
+ a25021a359e0a1c9da1853f80452d5a291f3a76ace45a9437c28bb1a70050926  apps/api/tests/unit/test_m5_contracts.py
+ 2d5dfbba4b063b02205a4142b5b336e114645cff954b51c34ad7060d4848bff9  apps/api/tests/unit/test_q1_contracts.py
+-c5f3a0997d5e868d76f1a753b5d9bba59801b8914251ba4090daccf4a3e07957  apps/api/tests/unit/test_q2_contracts.py
++5d47610db195415645e712e43e4dc7f43db2abecc33438dea3a1752839ddb22d  apps/api/tests/unit/test_q2_contracts.py
+ d9b150fa00f9f08de01cf3600ca31c3dc55fd6289766fb06e657b3e511a76c05  apps/api/tests/unit/test_q3_entitlements.py
+ 5b72ffe36d4c16a5d91e26a7ff441c5b0f3019d8883dce8ddc29d6c143912b85  apps/api/tests/unit/test_q4_access_reset.py
+ 7579c364dfb9f70b3ddfe88e229147f34bdaa077c6c1b043594f997d3bef0a15  apps/api/tests/unit/test_wp2_audit.py
+@@ -141,8 +143,8 @@
+ 17c421bd3c5a0bfdc0b47bc090c972db25956105deb4b65a777f494e152aeb67  apps/web/shared/base.css
+ a7ff7a0ee829c427e7d77e216ccfcf3ef0b6041a2af46611223de501d00ee31f  apps/web/shared/core.js
+ 96967e69ed7bf028fe462b693982144910caf643b9365f0e2283e3cbffc2a51e  apps/web/shared/dialogs.js
+-f92c922e5d59d989b8e39cc3836c86ad8b4689d4087402bda483e0101f26793d  docs/PROJECT_CONTEXT.md
+-86dc6221d9694c279512a752bbcb1fb6bc9e45133ff6d10c729f7086f97a961e  docs/acceptance-matrix.md
++e76b6635df53506b3a5db1aca21de23a7d3b521bb83b6cd1507595a86110b7b0  docs/PROJECT_CONTEXT.md
++e1948df3817e0032a59504d54cba34257e5358496e8c155a46ca817ef7513a1f  docs/acceptance-matrix.md
+ b9c1da9ee965da0abb6f34fde91bf8f3613ef4ddcb40ee78158242f35b1acdde  docs/architecture/ADR-0002-phase2-shared-foundation.md
+ 29ccc56b0cb2e989c1e92744d0ec02998b029d0eed2defc38d2529f383622c20  docs/architecture/ADR-0003-mdl.md
+ f00b6fe1d802d7ff658f3a5639f694e7a278a6c1bbf57e37e826704eddf218ab  docs/architecture/ADR-0004-qta.md
+@@ -175,17 +177,18 @@
+ 7657e380930b43b17d117055cf52c7390cbdee054e0eff3a522f4b4ce2d40497  docs/phase3/MDL_REQUIREMENTS_TRACEABILITY.md
+ 3feaeba94c4d6b0a178de2fb910b9ff33960759c858a4c57a4af937c50fd35ca  docs/phase3/mdl-handoff.md
+ 9871f2453d242092b8bfabd3b41f177c2c4f33fffb7d835ae117c88c186b8c18  docs/phase4/QTA_ARCHITECTURE_AND_DECISIONS.md
+-534e31ba17457bf43fbcb379ed67030370ff9e201ba2422d0404d1c13816e053  docs/phase4/QTA_IMPLEMENTATION_PLAN.md
++9132f91d82ed94db9a58ea432d05ea6ef86ac20fbb965bc74fdf1dfa5765341f  docs/phase4/QTA_IMPLEMENTATION_PLAN.md
+ 1fa7f68533bec3a50deaf30bf93bf02d7faea837307190b99cf1072c916a4a06  docs/phase4/QTA_OPEN_DECISIONS.md
+ 88b71f0f670276c0b8636c8e08ec73115c3835a070cb4c28413940d79f24b6e3  docs/phase4/QTA_Q1_REVIEW.md
+ ea6cf6516c3b32b92ed9418f323beeaad5fb80e0cb5b672b255b7f24fe4fb3db  docs/phase4/QTA_Q2_PROMPT.md
+ 4f27fb2b87aad5c1e3df28641ba29dc30af20f9c6ed09c70e9e42367253ff01c  docs/phase4/QTA_Q3_PROMPT.md
+ 8e002e4c0d13ef2ee254e924055ced4e33af44842c5be6851a6b3309dde5ae8b  docs/phase4/QTA_Q4_PROMPT.md
+ 78f44be7c44ee0da3f934ad843059cbfafd08dbe7494e83b69a974803236f602  docs/phase4/QTA_Q5_PROMPT.md
+-a438759473a162a9993d9fec5c8cda71651bffad8a8bb72a97770f100bd920ca  docs/phase4/QTA_REQUIREMENTS_TRACEABILITY.md
++ef5727cff3e2691f2558d47d66a68740310db8ca73853e39b44bc8dfb6ffcab0  docs/phase4/QTA_REQUIREMENTS_TRACEABILITY.md
+ 1804facf88cef392c074bc9c838fdf4744862590db279cc95287f357cd9e461b  docs/phase4/reports/QTA_Q2_REPORT.md
+ 8e47c78d1b361653faa2558facd981b6f3fd44e0c5c80404d9616ee8b6d8a53a  docs/phase4/reports/QTA_Q3_REPORT.md
+ 1c1a741bbd20b62c17920bd92157eee7887c2ea6537dff6a6d546f0bfa584fc7  docs/phase4/reports/QTA_Q4_REPORT.md
++8e8eec6780a33ae6a6fd7814acaeb4f54a31c8a117e54ec5c455711520c9ee05  docs/phase4/reports/QTA_Q5_REPORT.md
+ 02f3a3a2c4ad969e8ce448497265b1debee166a58e47742bcbfe397e4a4f2562  docs/phase4/reports/q2/changed-files.txt
+ 06b1d6a5a041d93abba0418308930db967f359ddf3ae2449d998c16ffcb7877c  docs/phase4/reports/q2/git-status-after.txt
+ ea56070e74437c448df247dbdb8846b38cb50afc29dd0725ecc6f327ffbd016d  docs/phase4/reports/q2/git-status-before.txt
+@@ -258,3 +261,4 @@
+ 71bbd79ddb895fd7b609385f169a46b7ac45db4f337108e6b288ba5cf92f8ac9  tests/browser/test_mdl.py
+ e5341a5be840c342ba9b3fdcd782257b5ba690050a5255f11defdc6e2c7b0c34  tests/browser/test_mdl_operations.py
+ f51f78bd301193e5af756f050c10b4c2f68a746af61e4a574aa774e56af053ae  tests/browser/test_operations.py
++b1cf1368c136eb856efad7e8f76ed21ad2a94436ee06d9dd49f1f0c5d967c31d  tests/browser/test_qta.py

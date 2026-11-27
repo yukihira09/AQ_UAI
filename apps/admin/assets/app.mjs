@@ -1,6 +1,7 @@
 import { createClient, RequestError } from './api.mjs';
 import { tabs as mdlTabs } from './mdl.mjs';
 import { pageContent, sections } from './pages.mjs';
+import { tabs as qtaTabs } from './qta.mjs';
 import { actions, button, el, field, showError, submitForm } from './ui.mjs';
 
 const root = document.querySelector('#application');
@@ -129,6 +130,13 @@ function currentRoute() {
     const [detail, ...extra] = rest;
     if (extra.length || (id !== undefined && !Object.hasOwn(mdlTabs, id)) ||
       (detail !== undefined && (!['providers', 'models'].includes(id) || !uuid.test(detail)))) return [];
+    return [route, id, detail];
+  }
+  if (route === 'qta') {
+    // #qta, #qta/<tab>, #qta/groups/<uuid>
+    const [detail, ...extra] = rest;
+    if (extra.length || (id !== undefined && !Object.hasOwn(qtaTabs, id)) ||
+      (detail !== undefined && (id !== 'groups' || !uuid.test(detail)))) return [];
     return [route, id, detail];
   }
   if (!Object.hasOwn(sections, route) || rest.length || (id !== undefined &&

@@ -161,3 +161,33 @@ dialog::backdrop { background: rgb(19 37 61 / 54%); }
 .issue-list { margin-top: .25rem; font-size: .86rem; color: #744900; }
 .change-list { font-size: .86rem; }
 .change-list li + li { margin-top: .15rem; }
+
+/* QTA (#qta) — append-only styles */
+.badge.red { color: #84232c; background: #ffe4e6; }
+.qta-header-bar { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: .75rem; margin-bottom: .75rem; }
+.qta-header-bar .field { min-width: 11rem; max-width: 15rem; }
+.qta-budget-body { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: .75rem; }
+.qta-revisions { min-width: 0; }
+.qta-revisions[open] { display: grid; grid-template-columns: minmax(0, 1fr); gap: .4rem; min-width: 0; }
+.qta-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: .65rem; }
+.qta-metric { border: 1px solid var(--line); border-radius: .6rem; padding: .65rem .8rem; background: #f8fafc; min-width: 0; }
+.qta-metric-label { font-size: .82rem; color: var(--muted); margin-bottom: .2rem; }
+.qta-metric-value { font-weight: 600; font-size: 1rem; overflow-wrap: anywhere; }
+.qta-banner-danger { border: 1px solid #d97777; background: #fff5f5; color: #7a1c1c; border-radius: .6rem; padding: .8rem 1rem; margin: .75rem 0; display: grid; gap: .35rem; min-width: 0; }
+.qta-banner-info { border: 1px solid var(--line); background: #f3f7fc; border-radius: .6rem; padding: .65rem .9rem; margin: .5rem 0; font-size: .92rem; }
+.qta-quota-input { width: 100%; min-width: 6.5rem; max-width: 11rem; }
+.qta-pct-input { width: 100%; min-width: 4.5rem; max-width: 6.5rem; }
+.qta-contrib-list { margin: 0; padding-left: 1.1rem; font-size: .88rem; }
+.qta-contrib-list li + li { margin-top: .15rem; }
+.qta-readonly-box { padding: .48rem .65rem; border: 1px solid var(--line); border-radius: .45rem; background: #f3f4f6; color: #374151; font-size: .94rem; }
+.qta-section-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; min-width: 0; max-width: 100%; }
+.qta-section-stack > *, .qta-metrics > *, .qta-header-bar > * { min-width: 0; }
+.qta-inline-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .75rem; margin-bottom: .75rem; }
+.qta-inline-controls .field { min-width: 11rem; }
+@media (max-width: 720px) {
+  .qta-header-bar { flex-direction: column; align-items: stretch; }
+  .qta-header-bar .field { max-width: none; }
+  .qta-metrics { grid-template-columns: 1fr; }
+  .qta-inline-controls { flex-direction: column; align-items: stretch; }
+  .qta-inline-controls .field { min-width: 0; width: 100%; }
+}

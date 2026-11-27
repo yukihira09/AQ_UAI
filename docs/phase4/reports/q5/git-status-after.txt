@@ -1,0 +1,15 @@
+ M CLAUDE.md
+ M apps/admin/assets/admin.css
+ M apps/admin/assets/api.mjs
+ M apps/admin/assets/app.mjs
+ M apps/admin/assets/pages.mjs
+ M apps/api/tests/unit/test_q2_contracts.py
+ M docs/PROJECT_CONTEXT.md
+ M docs/acceptance-matrix.md
+ M docs/phase4/QTA_IMPLEMENTATION_PLAN.md
+ M docs/phase4/QTA_REQUIREMENTS_TRACEABILITY.md
+?? apps/admin/assets/qta.mjs
+?? apps/api/tests/integration/test_q5_carryover.py
+?? docs/phase4/reports/QTA_Q5_REPORT.md
+?? docs/phase4/reports/q5/
+?? tests/browser/test_qta.py

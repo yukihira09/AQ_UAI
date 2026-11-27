@@ -19,13 +19,20 @@ export class RequestError extends Error {
   }
 }
 
-// Only the API's allowlisted detail keys, each a short list of fixed lowercase identifiers
-// (for example used_in: ["routing.primary"]). Anything else is ignored, never rendered.
+// Only the API's allowlisted detail keys: short lists of fixed lowercase identifiers
+// (used_in, reasons) or non-negative safe integers (allocated, deficit for QTA budgets).
+// Anything else is ignored, never rendered.
 function safeDetails(details) {
   const result = {};
   for (const key of ['used_in', 'reasons']) {
     const value = details?.[key];
     if (Array.isArray(value) && value.length <= 48 && value.every(item => typeof item === 'string' && /^[a-z][a-z0-9_.-]{0,63}$/.test(item))) {
+      result[key] = value;
+    }
+  }
+  for (const key of ['allocated', 'deficit']) {
+    const value = details?.[key];
+    if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) {
       result[key] = value;
     }
   }
