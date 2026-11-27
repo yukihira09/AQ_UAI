@@ -110,11 +110,22 @@ def test_qta_openapi_routes_and_no_sync_run_mutation(openapi):
         "/api/v1/qta/groups/{group_id}/members": {"get"},
         "/api/v1/qta/groups/{group_id}/members/{user_id}": {"put", "delete"},
         "/api/v1/qta/groups/{group_id}/quotas": {"put"},
+        "/api/v1/qta/users": {"get"},
+        "/api/v1/qta/users/{user_id}/entitlements": {"get"},
+        "/api/v1/qta/users/{user_id}/suspensions": {"get", "post"},
+        "/api/v1/qta/users/{user_id}/restore": {"post"},
+        "/api/v1/qta/budgets": {"get"},
+        "/api/v1/qta/budgets/{month}": {"put"},
+        "/api/v1/qta/events": {"get"},
+        "/api/v1/qta/monthly-resets": {"get", "post"},
     }
     assert paths["/api/v1/qta/groups/sync-runs"] == {"get"}
 
 
 def test_qta_openapi_has_no_forbidden_fields_and_rejects_unknown_inputs(openapi):
+    # R4: request bodies and query/path parameters stay fully strict; response schemas
+    # may contain only the two explicit non-integrated consumption fields from architecture §2.3.
+    allowed_response_props = {"actual_consumption", "consumption_status"}
     qta_schemas = {
         name: schema
         for name, schema in openapi["components"]["schemas"].items()
@@ -122,9 +133,27 @@ def test_qta_openapi_has_no_forbidden_fields_and_rejects_unknown_inputs(openapi)
     }
     assert qta_schemas
     for name, schema in qta_schemas.items():
-        props = list(schema.get("properties", {}).keys())
-        assert not [key for key in props if FORBIDDEN_FIELD.search(key)], (name, props)
-        assert not FORBIDDEN_FIELD.search(json.dumps(schema)), name
+        model = getattr(schemas, name, None)
+        is_output = isinstance(model, type) and issubclass(model, schemas.Output)
+        props = schema.get("properties", {})
+        if is_output:
+            bad = [
+                key
+                for key in props
+                if FORBIDDEN_FIELD.search(key) and key not in allowed_response_props
+            ]
+            assert not bad, (name, bad)
+            scrubbed = {
+                **schema,
+                "properties": {k: v for k, v in props.items() if k not in allowed_response_props},
+                "required": [
+                    k for k in schema.get("required", []) if k not in allowed_response_props
+                ],
+            }
+            assert not FORBIDDEN_FIELD.search(json.dumps(scrubbed)), name
+        else:
+            assert not [key for key in props if FORBIDDEN_FIELD.search(key)], (name, list(props))
+            assert not FORBIDDEN_FIELD.search(json.dumps(schema)), name
     for path, operations in openapi["paths"].items():
         if "/qta" in path:
             assert not FORBIDDEN_FIELD.search(json.dumps(operations)), path

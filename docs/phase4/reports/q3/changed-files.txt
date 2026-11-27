@@ -1,0 +1,58 @@
+1a2
+> 5729a3ed02d8b2db76fdf71beef8e6a7885ad5ace578366b7f2ed389acc8de7e  .github/workflows/context-snapshot.yml
+35c36
+< 2c4c7a2fedf93716b33ae92a3634e5a2e1c3361c1db592005a08cc2798053f25  apps/api/src/aq_uai_api/api/errors.py
+---
+> c8d19a76ee82b8283207ab9e5b14395ac109c07882b2532a67fe75e1f4137cd1  apps/api/src/aq_uai_api/api/errors.py
+40c41
+< ae743f8d8c024d55ab9c9b984bc078cbd6841dd03e12130a157fb75ff5a811bb  apps/api/src/aq_uai_api/api/v1/qta.py
+---
+> b37a06992dbd0933584a768e8fffbeabdee2510bd6cae0e9026b11d95c46d2eb  apps/api/src/aq_uai_api/api/v1/qta.py
+52c53
+< 0f28a748456a27d8473802a96e0df98006384ee7fd250fc7fde2f9f9c2f04dac  apps/api/src/aq_uai_api/core/config.py
+---
+> bbf6848528d082d593e2e91bb4780b89a065647b95c242d0846891179831001a  apps/api/src/aq_uai_api/core/config.py
+82a84
+> f06a2c38a755811448ae105357bbe5c213b62d3eeabfadd99183a878fa848b52  apps/api/src/aq_uai_api/qta/entitlements.py
+84,86c86,89
+< ef65adb2fd9d2851d547f39f3c6d11fa0198b44c39cdf3d703047bd60d695e37  apps/api/src/aq_uai_api/qta/queries.py
+< ece1a1df50f73ddf9f82f2325e70d73386748fd22ecd2a20724918a9217e4bb6  apps/api/src/aq_uai_api/qta/schemas.py
+< e3d3da7d50fe422a068ab8e6f36598ad4766e18a50171e1ce5fb6eff52c504fc  apps/api/src/aq_uai_api/qta/service.py
+---
+> f36b37df63041452d6454188ec7f57280a286756d8ba1d1f9c8d9750022c5825  apps/api/src/aq_uai_api/qta/periods.py
+> d4ed2ff29e2849077a7e8ac7b51d54dac09a6bc77af7f97913b97db7e20c3826  apps/api/src/aq_uai_api/qta/queries.py
+> ab64e3144a9260326fddb3f837b54dbef9c12fc3f971a5ac089166151475d65a  apps/api/src/aq_uai_api/qta/schemas.py
+> 859b3d56edbad903365c418386557326347755b9e46968556d9e45a47fe4c6b2  apps/api/src/aq_uai_api/qta/service.py
+98a102
+> 7d44ea9740d2b7b8285facb7b174e767527d9be61c154a81c9ab274224fac773  apps/api/tests/integration/test_q3_qta_lookup_budgets.py
+113,114c117,119
+< a5993adbb86228e619e450cb09c07ee2b7a079366a062e639c72d105a0551830  apps/api/tests/unit/test_q1_contracts.py
+< a222b561c5cfc7c794f4ab5747505ad03b7659e62af81bd9e6001be16a3ef601  apps/api/tests/unit/test_q2_contracts.py
+---
+> 2d5dfbba4b063b02205a4142b5b336e114645cff954b51c34ad7060d4848bff9  apps/api/tests/unit/test_q1_contracts.py
+> 5e1582285110cd889604dbcbe7bb09b444c322c25269831d49a9102903628721  apps/api/tests/unit/test_q2_contracts.py
+> d9b150fa00f9f08de01cf3600ca31c3dc55fd6289766fb06e657b3e511a76c05  apps/api/tests/unit/test_q3_entitlements.py
+135,136c140,141
+< 0f80c45fb6877d52fc5208c39ffcce03f885af56f21078e051b3284701afc541  docs/PROJECT_CONTEXT.md
+< 0b0a349ac5086a6fff27f559258449918e497ea41ef70fe95919bb8e63bffd43  docs/acceptance-matrix.md
+---
+> 1fd5c2dbd4dea909bb0d2001b1384e4201b2d54c0b79623c3e6853e709e2ab2e  docs/PROJECT_CONTEXT.md
+> d0a457d159950654de130da0dd72e80d1716f0b0ca524768aed5e700fdb667ad  docs/acceptance-matrix.md
+169c174
+< 21224e94f22db9c359cb44061eabd5c934ed2d8a1d0ceffe255afdf1f77c6efe  docs/phase4/QTA_IMPLEMENTATION_PLAN.md
+---
+> 13e3799ca339728e47086daac9a8ff21f8d444bcfcf4af743fcb0d66d62aec6c  docs/phase4/QTA_IMPLEMENTATION_PLAN.md
+174c179
+< 20cf96f5e248f8ec562f20e734abcfe3f418edcbce394655c3a7d77916bc7352  docs/phase4/QTA_REQUIREMENTS_TRACEABILITY.md
+---
+> 9a0aedf66b448f6d4a27470aacd10ebdeca0b18c2dd42069fd8776784af196a8  docs/phase4/QTA_REQUIREMENTS_TRACEABILITY.md
+175a181
+> 99feab9b8b698b275e31c42f99a9bd4f44e7ab59eb569ddf93c230f190537cbe  docs/phase4/reports/QTA_Q3_REPORT.md
+184a191,197
+> 97580eee9990cb126c519812879cf55c19bf547783af9d6a99de30119955b67e  docs/phase4/reports/q3/baseline-gate.log
+> 079201ab7d756ee4f4a7da7c7af79ea9bfe96d3119a6fc73b4da1c7035ac429e  docs/phase4/reports/q3/final-gate.log
+> b7a043c474f0dd914e42c8c453c78f42c2f7a857b854f272d97c845c20c827a5  docs/phase4/reports/q3/focused-tests.log
+> e7bfbb78da45bea13f83c36d7680af322a4585b90046910358a13cfd441668af  docs/phase4/reports/q3/git-status-after.txt
+> 969a3369e34c528519de4ea4ad0e4f277d0cda87cafa300a0eb8ea78cecf209c  docs/phase4/reports/q3/git-status-before.txt
+> be4a2d9621af43cba6b6f9171ecff5c24160baabbfbeb14c0736da31bf3be34b  docs/phase4/reports/q3/hashes-before.txt
+> 6d87e7969e4f8e7ef01c1a945fde0b066a97f41036074382f8184426a6d0dc85  docs/phase4/reports/q3/mutation-proof.log

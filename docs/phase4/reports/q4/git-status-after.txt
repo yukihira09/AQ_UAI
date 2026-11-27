@@ -1,0 +1,32 @@
+ M CLAUDE.md
+ M apps/api/src/aq_uai_api/api/errors.py
+ M apps/api/src/aq_uai_api/api/v1/qta.py
+ M apps/api/src/aq_uai_api/core/config.py
+ M apps/api/src/aq_uai_api/db/audit.py
+ M apps/api/src/aq_uai_api/qta/queries.py
+ M apps/api/src/aq_uai_api/qta/schemas.py
+ M apps/api/src/aq_uai_api/qta/service.py
+ M apps/api/tests/unit/test_q1_contracts.py
+ M apps/api/tests/unit/test_q2_contracts.py
+ M docs/PROJECT_CONTEXT.md
+ M docs/acceptance-matrix.md
+ M docs/architecture/ADR-0004-qta.md
+ M docs/phase4/QTA_ARCHITECTURE_AND_DECISIONS.md
+ M docs/phase4/QTA_IMPLEMENTATION_PLAN.md
+ M docs/phase4/QTA_REQUIREMENTS_TRACEABILITY.md
+ M tests/browser/conftest.py
+?? apps/api/src/aq_uai_api/qta/access.py
+?? apps/api/src/aq_uai_api/qta/entitlements.py
+?? apps/api/src/aq_uai_api/qta/periods.py
+?? apps/api/src/aq_uai_api/qta/reset.py
+?? apps/api/tests/integration/test_q3_qta_lookup_budgets.py
+?? apps/api/tests/integration/test_q4_carryover.py
+?? apps/api/tests/integration/test_q4_qta_killswitch_reset.py
+?? apps/api/tests/unit/test_q3_entitlements.py
+?? apps/api/tests/unit/test_q4_access_reset.py
+?? docs/phase4/QTA_Q3_PROMPT.md
+?? docs/phase4/QTA_Q4_PROMPT.md
+?? docs/phase4/reports/QTA_Q3_REPORT.md
+?? docs/phase4/reports/QTA_Q4_REPORT.md
+?? docs/phase4/reports/q3/
+?? docs/phase4/reports/q4/

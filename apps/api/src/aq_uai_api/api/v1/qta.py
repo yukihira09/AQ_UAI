@@ -1,6 +1,7 @@
-"""Versioned QTA endpoints (Phase 4, Stage Q2).
+"""Versioned QTA endpoints (Phase 4, Stages Q2–Q4).
 
-GET endpoints require GLOBAL ``qta.read``; every write requires direct GLOBAL ``qta.manage``
+GET endpoints require ``qta.read`` (GLOBAL for institutional resources; GLOBAL or exact-UNIT
+for user lookup and user suspension history); every write requires direct GLOBAL ``qta.manage``
 through the shared protected-write path (session cookie, exact Origin, CSRF header,
 transaction-time re-authorization, same-transaction typed audit).
 """
@@ -8,7 +9,7 @@ transaction-time re-authorization, same-transaction typed audit).
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Body, Depends, Query, Request, Response
 from sqlalchemy.orm import Session
 
 from aq_uai_api.auth.write import WriteProof
@@ -45,7 +46,7 @@ Writer = Annotated[WriteContext, Depends(_write_context)]
 
 
 def _empty_body(payload: Input | None = None) -> None:
-    """State-change and sync routes accept no body fields."""
+    """State-change, sync, and manual reset routes accept no body fields."""
 
 
 Empty = [Depends(_empty_body)]
@@ -138,3 +139,89 @@ def upsert_group_quotas(
     group_id: UUID, payload: schemas.UpsertGroupQuotas, writer: Writer
 ) -> schemas.QtaGroupOut:
     return service.upsert_group_quotas(writer, group_id, payload)
+
+
+@router.get("/users")
+def list_users(
+    db: DB, authority: Reader, params: Annotated[SearchParams, Query()]
+) -> Page[schemas.QtaUserOut]:
+    return queries.users(db, authority, params)
+
+
+@router.get("/users/{user_id}/entitlements")
+def user_entitlements(
+    user_id: UUID,
+    db: DB,
+    authority: Reader,
+    settings: Config,
+    params: Annotated[schemas.MonthQuery, Query()],
+) -> schemas.UserEntitlementsOut:
+    return queries.user_entitlements(db, authority, user_id, params, settings)
+
+
+@router.get("/users/{user_id}/suspensions")
+def list_user_suspensions(
+    user_id: UUID,
+    db: DB,
+    authority: Reader,
+    params: Annotated[PageParams, Query()],
+) -> Page[schemas.SuspensionOut]:
+    return queries.user_suspensions(db, authority, user_id, params)
+
+
+@router.post("/users/{user_id}/suspensions", status_code=201)
+def suspend_user(
+    user_id: UUID, payload: schemas.SuspendUser, writer: Writer
+) -> schemas.SuspensionOut:
+    return service.suspend_user(writer, user_id, payload)
+
+
+@router.post("/users/{user_id}/restore")
+def restore_user(
+    user_id: UUID,
+    writer: Writer,
+    payload: Annotated[schemas.RestoreUser | None, Body()] = None,
+) -> schemas.SuspensionOut:
+    return service.restore_user(writer, user_id, payload or schemas.RestoreUser())
+
+
+@router.get("/budgets")
+def get_monthly_budget(
+    db: DB,
+    authority: Reader,
+    settings: Config,
+    params: Annotated[schemas.MonthQuery, Query()],
+) -> schemas.MonthlyBudgetOut:
+    return queries.budget(db, authority, params, settings)
+
+
+@router.put("/budgets/{month}")
+def set_monthly_budget(
+    month: str, payload: schemas.SetMonthlyBudget, writer: Writer
+) -> schemas.MonthlyBudgetOut:
+    return service.record_budget_revision(writer, month, payload)
+
+
+@router.get("/events")
+def list_events(
+    db: DB,
+    authority: Reader,
+    settings: Config,
+    params: Annotated[schemas.QtaEventFilters, Query()],
+) -> Page[schemas.QtaEventOut]:
+    return queries.events(db, authority, params, settings)
+
+
+@router.get("/monthly-resets")
+def list_monthly_resets(
+    db: DB,
+    authority: Reader,
+    settings: Config,
+    params: Annotated[PageParams, Query()],
+) -> schemas.MonthlyResetsOut:
+    return queries.monthly_resets(db, authority, params, settings)
+
+
+@router.post("/monthly-resets", status_code=201, dependencies=Empty)
+def simulate_monthly_reset(writer: Writer) -> schemas.MonthlyResetOut:
+    return service.simulate_monthly_reset(writer)

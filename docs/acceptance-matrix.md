@@ -4,7 +4,7 @@
 
 **MDL update (2026-11-26):** the nine MDL requirements are implemented and have automated evidence (see the Evidence column). Technical verification is not acceptance: they stay **not accepted** until a Tech Lead or Product Owner records sign-off here.
 
-**QTA update (2026-11-27, Q2):** Phase 4 Stages Q0–Q1-R (RBAC `0007_qta_access_catalog`, 8-table schema `0008_qta_schema`, PO decisions `PD-Q1..PD-Q6`, `ADR-0004`) and Stage Q2 (group registry, sync, AI-specialist group lifecycle reusing `directory.service`, and group × model quota configuration APIs under `/api/v1/qta`; see [QTA_Q2_REPORT.md](phase4/reports/QTA_Q2_REPORT.md)) are implemented and verified via the full `verify_phase2.sh` gate (API: 525 passed, 1 skipped; browser: 16 passed; awaiting review). No `FR-QTA-*` requirement is formally accepted yet (entitlements, budgets, kill-switch, reset, and `#qta` Admin UI arrive in Stages Q3–Q5). CRT is not started.
+**QTA update (2026-11-27, Q4):** Phase 4 Stages Q0–Q4 (RBAC `0007_qta_access_catalog`, 8-table schema `0008_qta_schema`, PO decisions `PD-Q1..PD-Q6`, `ADR-0004`, Q2 group registry/sync/specialist groups/quotas, Q3 live additive entitlements & append-only school monthly budgets, and Q4 individual kill-switch/restore, `check_ai_access`, append-only events, monthly reset API/CLI & carry-over fixes C1–C4; see [QTA_Q4_REPORT.md](phase4/reports/QTA_Q4_REPORT.md)) are implemented and verified via the full `verify_phase2.sh` gate (API: 578 passed, 1 skipped; browser: 16 passed; awaiting review). No `FR-QTA-*` requirement is formally accepted yet (`#qta` Admin UI arrives in Stage Q5; handoff in Q6). CRT is not started.
 
 | FRD | Requirement | Implementation | Evidence |
 | --- | --- | --- | --- |

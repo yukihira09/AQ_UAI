@@ -26,6 +26,7 @@ QTA_CODES = [
     "QTA_USER_NOT_SUSPENDED",
     "QTA_RESET_ALREADY_EXECUTED",
     "QTA_DUPLICATE",
+    "QTA_PERIOD_NOT_OPEN",
 ]
 MIGRATIONS = Path(__file__).resolve().parents[2] / "migrations" / "versions"
 

@@ -1,7 +1,7 @@
 # AQ EduUAI — Project context
 
 **Audience:** a developer or reviewer (including an AI researcher new to backend work) opening this repository for the first time.
-**Prepared:** 2026-11-25 (M0); **updated 2026-11-27 after Phase 4 Q2**. Repository state described: branch `main`; Phase 3 MDL (M1–M7) and Phase 4 QTA (Q0, Q1, Q1-R, Q2) are implemented and technically verified.
+**Prepared:** 2026-11-25 (M0); **updated 2026-11-27 after Phase 4 Q4**. Repository state described: branch `main`; Phase 3 MDL (M1–M7) and Phase 4 QTA (Q0, Q1, Q1-R, Q2, Q3, Q4) are implemented and technically verified.
 **Rule for this file:** it links to the detailed documents instead of copying them. If a linked document and this file disagree, the linked document wins; fix this file.
 
 ## 1. What / why
@@ -11,7 +11,7 @@ AQ EduUAI is a standalone, independently deployable **university AI-governance**
 | Module | Meaning | FRD (canonical copy) | Server status |
 | --- | --- | --- | --- |
 | MDL | AI providers and models: registry, real connection test, primary/fallback routing, data-protection agreement (DPA) evidence, risk classification | [FRD MDL](frd/AQ-FRD-UAI-MDL-001.md) | **Implemented (M1–M7) and technically verified; not formally accepted; live-provider run pending** (see [Phase 3 plan](phase3/MDL_IMPLEMENTATION_PLAN.md), [handoff](phase3/mdl-handoff.md)) |
-| QTA | Quotas (monthly institutional cap, group × model quotas, additive lookup, kill-switch, monthly reset) | [FRD QTA](frd/AQ-FRD-UAI-QTA-001.md) | **In progress (Phase 4 Q0–Q2 implemented & verified, awaiting review: RBAC `0007`, 8-table schema `0008`, Q2 registry/sync/specialist-group/group×model quota APIs under `/api/v1/qta`; Q3–Q6 next)** (see [Phase 4 plan](phase4/QTA_IMPLEMENTATION_PLAN.md), [Q2 report](phase4/reports/QTA_Q2_REPORT.md)) |
+| QTA | Quotas (monthly institutional cap, group × model quotas, additive lookup, kill-switch, monthly reset) | [FRD QTA](frd/AQ-FRD-UAI-QTA-001.md) | **In progress (Phase 4 Q0–Q4 implemented & verified, awaiting Q4 review: RBAC `0007`, 8-table schema `0008`, Q2 registry/sync/quotas, Q3 live additive entitlements & append-only budgets, Q4 kill-switch/restore, `check_ai_access`, events & monthly reset API/CLI; Q5 Admin UI & Q6 handoff next)** (see [Phase 4 plan](phase4/QTA_IMPLEMENTATION_PLAN.md), [Q4 report](phase4/reports/QTA_Q4_REPORT.md)) |
 | CRT | Credits (append-only ledger) | [FRD CRT](frd/AQ-FRD-UAI-CRT-001.md) | Not started (Phase 5) |
 
 The company's shared framework is unavailable, so this repository supplies its own identity, permission, audit and directory foundation. Modules must stay adapter-friendly so a later framework can replace pieces.
@@ -48,7 +48,7 @@ Repository map:
 | --- | --- |
 | `apps/web/` | Preserved original prototype (14 hashed assets; do not edit) |
 | `apps/admin/` | Real admin UI (`index.html`, `assets/{admin.css,api.mjs,app.mjs,pages.mjs,ui.mjs,mdl.mjs}`; `mdl.mjs` is the MDL section, M6) |
-| `apps/api/src/aq_uai_api/` | `api/`, `auth/`, `authorization/`, `core/`, `db/`, `directory/`, `mdl/` (Phase 3), `qta/` (Phase 4 Q1–Q2: models, schemas, queries, service), `main.py` |
+| `apps/api/src/aq_uai_api/` | `api/`, `auth/`, `authorization/`, `core/`, `db/`, `directory/`, `mdl/` (Phase 3), `qta/` (Phase 4 Q1–Q4: models, periods, entitlements, access, reset, schemas, queries, service), `main.py` |
 | `apps/api/migrations/versions/` | `0001`–`0002` (Phase 1–2), `0003`–`0006` (Phase 3 MDL), `0007_qta_access_catalog`, `0008_qta_schema` (current head, Phase 4 Q1) |
 | `apps/api/tests/`, `tests/browser/` | pytest suites (`tests/live/` holds the opt-in, normally skipped live-provider check); Playwright/Chromium suites |
 | `infra/` | Compose stack, nginx config, optional synthetic AI provider (`demo-provider/`, `compose.demo-provider.yaml`) |
@@ -109,7 +109,7 @@ Real, server-enforced: sign-in, sessions, RBAC grants, directory (units, users, 
 ## 8. Roadmap and boundaries for MDL / QTA / CRT
 
 - **MDL (Phase 3):** packages M0–M7 in [`docs/phase3/`](phase3/MDL_IMPLEMENTATION_PLAN.md). **M1–M7 are implemented and technically verified; formal acceptance (Tech Lead / Product Owner) is not recorded.** A synthetic demo provider replaces a real vendor for this project (Project Owner decision D15, `bash scripts/dev-up.sh --demo-provider`). External inputs still open: official risk criteria (OQ-09-01), statutory retention periods, legal confirmation of the D5 reading, QTA/CRT for end-to-end quota proof. Decisions: [register](phase3/MDL_OPEN_DECISIONS.md); architecture: [ADR-0003](architecture/ADR-0003-mdl.md) (*Proposed*, with owner-delegated decisions recorded).
-- **QTA (Phase 4):** stages Q0–Q6 in [`docs/phase4/`](phase4/QTA_IMPLEMENTATION_PLAN.md). **Q0–Q1-R (RBAC `0007`, 8-table schema `0008`, PO decisions `PD-Q1..PD-Q6`, [ADR-0004](architecture/ADR-0004-qta.md)) and Q2 (group registry, sync, specialist groups reusing `directory.service`, and group × model quota APIs under `/api/v1/qta`; [Q2 report](phase4/reports/QTA_Q2_REPORT.md)) are implemented and verified (API 525 passed, 1 skipped; browser 16 passed; awaiting review).** Q3 (entitlements, additive lookup, append-only school monthly budgets) awaits separate authorization.
+- **QTA (Phase 4):** stages Q0–Q6 in [`docs/phase4/`](phase4/QTA_IMPLEMENTATION_PLAN.md). **Q0–Q4 (RBAC `0007`, 8-table schema `0008`, PO decisions `PD-Q1..PD-Q6`, [ADR-0004](architecture/ADR-0004-qta.md), Q2 group registry/sync/specialist groups/quotas, Q3 live additive entitlements & append-only monthly budgets, and Q4 kill-switch/restore, `check_ai_access`, events & monthly reset API/CLI; [Q4 report](phase4/reports/QTA_Q4_REPORT.md)) are implemented and verified (API 578 passed, 1 skipped; browser 16 passed; awaiting review).** Q5 (`#qta` Admin UI) awaits separate authorization.
 - **CRT (Phase 5):** append-only ledger; token/credit conversion undefined. Not started.
 - Boundary rules between modules: MDL does not import quota or credit tables; a future QTA/CRT registers its own "where used" checks for model deactivation; no module bypasses the shared foundations in section 4.
 

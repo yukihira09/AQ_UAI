@@ -77,6 +77,7 @@ class ErrorCode(Enum):
         "The monthly quota reset has already been executed for this period.",
     )
     QTA_DUPLICATE = (409, "A quota group or policy with the same identity already exists.")
+    QTA_PERIOD_NOT_OPEN = (422, "Only the current or next month can be used here.")
 
 
 _USED_IN_ITEM = re.compile(r"[a-z][a-z0-9_.-]{0,63}")

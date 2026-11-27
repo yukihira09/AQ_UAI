@@ -114,6 +114,13 @@ Q0 docs ─▶ Q1 schema/RBAC ─▶ Q1-R revision ─▶ Q2 registry/sync/quota
 - **Exclusions:** Kill-switch/restore, monthly reset, Admin UI (Q4–Q5).
 - **Gate:** `verify_phase2.sh` (static checks, Ruff, `alembic check`, full API + browser suites).
 
+### Q3 completion (2026-11-27)
+
+**Status: implemented, awaiting review.** Full 10-section report and evidence: [QTA_Q3_REPORT.md](reports/QTA_Q3_REPORT.md) (logs & hash manifest under `docs/phase4/reports/q3/`).
+
+- **Delivered:** `Settings.institution_timezone` (`Asia/Ho_Chi_Minh`, `ZoneInfo`-validated) in `core/config.py`; `QTA_PERIOD_NOT_OPEN` (422) appended in `api/errors.py`; new `qta/periods.py` (strict `YYYY-MM` parser, `utc_now()` clock seam, open current/next month window) and `qta/entitlements.py` (`compute_user_entitlements` additive `SUM` + `allocated_for_month` single SQL aggregate); 4 new endpoints under `/api/v1/qta` (`GET /users`, `GET /users/{user_id}/entitlements`, `GET /budgets`, `PUT /budgets/{month}` with `QTA_BUDGET_NAMESPACE` lock, `total_limit < allocated` 409 guard with `{allocated, deficit}`, append-only `qta_budget_revisions`, and same-transaction `BudgetRevisionRecorded` audit); 24 new tests (`test_q3_entitlements.py` 4 unit + `test_q3_qta_lookup_budgets.py` 20 PostgreSQL integration); 4 required mutation proofs passed with byte-identical post-restore hashes. Zero migrations added (head stays `0008_qta_schema`), zero `mdl/`/`directory/`/`authorization/`/`apps/web/` edits.
+- **Verification (full `scripts/verify_phase2.sh` gate, `docs/phase4/reports/q3/final-gate.log`, exit 0):** static checks PASS, `alembic check` clean, **API 549 passed, 1 skipped** (+24 over baseline 525), **browser 16 passed**. No `FR-QTA-*` requirement is formally accepted yet (Admin UI arrives in Q5).
+
 ---
 
 ## Q4 — Kill-switch / restore (`check_ai_access`) & monthly reset
@@ -129,6 +136,13 @@ Q0 docs ─▶ Q1 schema/RBAC ─▶ Q1-R revision ─▶ Q2 registry/sync/quota
   - `apps/api/tests/integration/test_q4_qta_killswitch_reset.py` (suspend with `expires_at=None` and with future `expires_at`; past `expires_at` / blank `reason` / blank `ordered_by` rejected 422; `suspended_by` always equals session actor even when `ordered_by` names someone else; `PAID_EXTERNAL_ONLY` blocks `EXTERNAL` models and allows `INTERNAL` models; `ALL_MODELS` blocks both; balances unchanged after suspend and restore; restore returns `ACTIVE` and records `RESTORE` event; lazy expiry auto-lifts suspension; concurrent suspend race returns 409 for second request; monthly reset CLI idempotent on retry; admin manual reset succeeds for current month, returns 409 on repeat, and rejects next/past month; catch-up after missed 00:00 works without backdating; zero rollover across months; active suspension survives monthly reset).
 - **Exclusions:** Admin UI (Q5); backup/restore rehearsal & handoff (Q6).
 - **Gate:** `verify_phase2.sh` (static checks, Ruff, `alembic check`, full API + browser suites).
+
+### Q4 completion (2026-11-27)
+
+**Status: implemented, awaiting review.** Full 11-section report, whole-module review, and evidence: [QTA_Q4_REPORT.md](reports/QTA_Q4_REPORT.md) (logs & SHA256 manifests under `docs/phase4/reports/q4/`).
+
+- **Delivered:** Carry-over fixes **C1–C4** (`usable_model_predicate` requiring `mdl_models.active AND mdl_providers.active` everywhere; single `_qualifying_quota_rows` selectable; `GroupQuotaUpdated.before_warning_threshold_pct`; 30s monotonic `wait_for_http` deadline in `tests/browser/conftest.py`); new `qta/access.py` (lazy-expiry suspension helpers, set-based `active_suspensions_for` without N+1, fail-closed `check_ai_access` ordered `UPPER_SNAKE` table `R5`/`R9`) and `qta/reset.py` (append-only `record_reset` under `QTA_RESET_NAMESPACE = 52003` + `python -m aq_uai_api.qta.reset` scheduled CLI); Q4 routes (`GET/POST /qta/users/{id}/suspensions`, `POST /qta/users/{id}/restore`, `GET /qta/events`, `GET/POST /qta/monthly-resets`) plus `quota_status`, active `suspension`, and per-model `access` on lookup endpoints; 29 new tests (`test_q4_access_reset.py` 5 unit + `test_q4_carryover.py` 3 integration + `test_q4_qta_killswitch_reset.py` 21 integration); two-run CLI smoke (`recorded=1 already=0` → `recorded=0 already=1`); 5 required mutation proofs passed with byte-identical post-restore hashes. Zero migrations added (head stays `0008_qta_schema`), zero `mdl/`/`directory/`/`authorization/`/`apps/web/` edits.
+- **Verification (full `scripts/verify_phase2.sh` gate, `docs/phase4/reports/q4/final-gate.log`, exit 0):** static checks PASS, `alembic check` clean, **API 578 passed, 1 skipped** (+29 over Q3 baseline 549), **browser 16 passed**. No `FR-QTA-*` requirement is formally accepted yet (Admin UI arrives in Q5).
 
 ---
 

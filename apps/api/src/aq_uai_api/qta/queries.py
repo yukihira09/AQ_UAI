@@ -1,26 +1,39 @@
-"""Read-side QTA queries and projections (Phase 4, Stage Q2).
+"""Read-side QTA queries and projections (Phase 4, Stages Q2–Q4).
 
-Every query is restricted to the caller's institution and requires GLOBAL ``qta.read``.
+Group/model/budget/event/reset routes require GLOBAL ``qta.read``; user lookup and user
+suspension history routes accept GLOBAL or exact-UNIT ``qta.read`` scoped via
+``scope.predicate(User.institution_id, User.primary_unit_id)``.
 Reads MDL tables (``mdl_models``, ``mdl_providers``) read-only; ``mdl/`` never imports ``qta/``.
-Live memberships are read directly from Phase 2 ``group_memberships`` without duplicating rows.
 """
 
 from collections import defaultdict
+from datetime import date
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
+from aq_uai_api.api.errors import DomainError, ErrorCode
 from aq_uai_api.authorization.policy import ActorAuthority
 from aq_uai_api.authorization.policy import PermissionCode as P
+from aq_uai_api.core.config import Settings
 from aq_uai_api.db.identity import AccountGroup, GroupMembership, User
 from aq_uai_api.directory import queries as dir_queries
 from aq_uai_api.directory import schemas as dir_schemas
 from aq_uai_api.directory.queries import one, page
 from aq_uai_api.directory.schemas import Page, PageParams, SearchParams
 from aq_uai_api.mdl.models import MdlModel, MdlProvider
-from aq_uai_api.qta import schemas
-from aq_uai_api.qta.models import QtaGroupModelQuota, QtaGroupSyncRun, QtaQuotaGroup
+from aq_uai_api.qta import access, entitlements, periods, schemas
+from aq_uai_api.qta.models import (
+    QtaBudgetRevision,
+    QtaEvent,
+    QtaGroupModelQuota,
+    QtaGroupSyncRun,
+    QtaMonthlyReset,
+    QtaQuotaGroup,
+    QtaSuspension,
+    QtaSuspensionRestoration,
+)
 
 
 def reader(authority: ActorAuthority) -> UUID:
@@ -51,7 +64,7 @@ def _model_out(model: MdlModel, provider: MdlProvider) -> schemas.QtaModelOut:
         display_name=model.display_name,
         capabilities=_capabilities(model),
         risk_level=model.risk_level,
-        active=model.active,
+        active=bool(model.active and provider.active),
     )
 
 
@@ -59,17 +72,7 @@ def models(
     db: Session, authority: ActorAuthority, params: SearchParams
 ) -> Page[schemas.QtaModelOut]:
     tenant = reader(authority)
-    statement = (
-        sa.select(MdlModel, MdlProvider)
-        .join(
-            MdlProvider,
-            sa.and_(
-                MdlProvider.id == MdlModel.provider_id,
-                MdlProvider.institution_id == MdlModel.institution_id,
-            ),
-        )
-        .where(MdlModel.institution_id == tenant, MdlModel.active.is_(True))
-    )
+    statement = entitlements.usable_models_query(tenant)
     if params.q:
         statement = statement.where(
             sa.or_(
@@ -118,7 +121,7 @@ def _quotas_by_group(
     if not group_ids:
         return {}
     rows = db.execute(
-        sa.select(QtaGroupModelQuota, MdlModel, MdlProvider)
+        sa.select(QtaGroupModelQuota, MdlModel, MdlProvider, entitlements.usable_model_predicate())
         .join(
             MdlModel,
             sa.and_(
@@ -140,14 +143,14 @@ def _quotas_by_group(
         .order_by(sa.func.lower(MdlModel.display_name), MdlModel.id)
     ).all()
     grouped: dict[UUID, list[schemas.GroupQuotaRuleOut]] = defaultdict(list)
-    for quota, model, provider in rows:
+    for quota, model, provider, usable in rows:
         grouped[quota.group_id].append(
             schemas.GroupQuotaRuleOut(
                 id=quota.id,
                 model_id=model.id,
                 model_technical_id=model.technical_id,
                 model_display_name=model.display_name,
-                model_active=model.active,
+                model_active=bool(usable),
                 provider_name=provider.name,
                 provider_type=provider.provider_type,
                 enabled=quota.enabled,
@@ -237,8 +240,6 @@ def group_detail_for_tenant(db: Session, tenant: UUID, group_id: UUID) -> schema
         _enrolled_groups_query(tenant).where(QtaQuotaGroup.group_id == group_id)
     ).one_or_none()
     if row is None:
-        from aq_uai_api.api.errors import DomainError, ErrorCode
-
         raise DomainError(ErrorCode.NOT_FOUND)
     return _project_groups(db, tenant, [row])[0]
 
@@ -286,3 +287,243 @@ def sync_runs(
         .order_by(QtaGroupSyncRun.synced_at.desc(), QtaGroupSyncRun.id.desc())
     )
     return page(db, statement, params, schemas.SyncRunOut.model_validate)
+
+
+def _scoped_user_query(authority: ActorAuthority):
+    scope = authority.scope_for(P.QTA_READ)
+    return sa.select(User).where(scope.predicate(User.institution_id, User.primary_unit_id))
+
+
+def users(
+    db: Session, authority: ActorAuthority, params: SearchParams
+) -> Page[schemas.QtaUserOut]:
+    """List users visible within the caller's GLOBAL or exact-UNIT qta.read scope (zero N+1)."""
+    authority.require_permission(P.QTA_READ)
+    query = _scoped_user_query(authority)
+    if params.q:
+        query = query.where(
+            sa.or_(
+                User.username.icontains(params.q, autoescape=True),
+                User.display_name.icontains(params.q, autoescape=True),
+                User.institutional_code.icontains(params.q, autoescape=True),
+            )
+        )
+    total = db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
+    ordered = query.order_by(User.username, User.id)
+    user_rows = list(db.scalars(ordered.offset(params.offset).limit(params.limit)).all())
+    active_suspensions = access.active_suspensions_for(
+        db, authority.institution_id, [row.id for row in user_rows]
+    )
+    items = [
+        schemas.QtaUserOut(
+            id=row.id,
+            username=row.username,
+            display_name=row.display_name,
+            institutional_code=row.institutional_code,
+            primary_unit_id=row.primary_unit_id,
+            state=row.state,
+            quota_status="SUSPENDED" if row.id in active_suspensions else "ACTIVE",
+        )
+        for row in user_rows
+    ]
+    return Page(items=items, total=int(total or 0), limit=params.limit, offset=params.offset)
+
+
+def user_entitlements(
+    db: Session,
+    authority: ActorAuthority,
+    user_id: UUID,
+    params: schemas.MonthQuery,
+    settings: Settings,
+) -> schemas.UserEntitlementsOut:
+    """Personal additive entitlement & kill-switch lookup for an open month."""
+    authority.require_permission(P.QTA_READ)
+    resolved_month = periods.resolve_month(params.month, settings, open_only=True)
+    user = one(db, _scoped_user_query(authority).where(User.id == user_id))
+    computed = entitlements.compute_user_entitlements(db, user.institution_id, user.id)
+    return schemas.UserEntitlementsOut(
+        user=schemas.QtaUserSummaryOut.model_validate(user),
+        month=periods.format_month(resolved_month),
+        quota_status=computed.quota_status,
+        suspension=computed.suspension,
+        memberships=computed.memberships,
+        models=computed.models,
+        base_entitlement_total=computed.base_entitlement_total,
+    )
+
+
+def user_suspensions(
+    db: Session,
+    authority: ActorAuthority,
+    user_id: UUID,
+    params: PageParams,
+) -> Page[schemas.SuspensionOut]:
+    """List suspension history for one user (GLOBAL or exact-UNIT qta.read, newest first)."""
+    authority.require_permission(P.QTA_READ)
+    user = one(db, _scoped_user_query(authority).where(User.id == user_id))
+    now = periods.utc_now()
+    statement = (
+        sa.select(QtaSuspension, QtaSuspensionRestoration)
+        .outerjoin(
+            QtaSuspensionRestoration,
+            sa.and_(
+                QtaSuspensionRestoration.suspension_id == QtaSuspension.id,
+                QtaSuspensionRestoration.institution_id == QtaSuspension.institution_id,
+            ),
+        )
+        .where(
+            QtaSuspension.institution_id == user.institution_id,
+            QtaSuspension.user_id == user.id,
+        )
+        .order_by(QtaSuspension.suspended_at.desc(), QtaSuspension.id.desc())
+    )
+    return page(
+        db,
+        statement,
+        params,
+        lambda susp, rest: access.suspension_out(susp, rest, now=now),
+    )
+
+
+def budget_for_tenant(
+    db: Session, tenant: UUID, resolved_month: date, settings: Settings
+) -> schemas.MonthlyBudgetOut:
+    revision_rows = list(
+        db.scalars(
+            sa.select(QtaBudgetRevision)
+            .where(
+                QtaBudgetRevision.institution_id == tenant,
+                QtaBudgetRevision.period_month == resolved_month,
+            )
+            .order_by(QtaBudgetRevision.revision.desc())
+        ).all()
+    )
+    revisions = [schemas.BudgetRevisionOut.model_validate(row) for row in revision_rows]
+    current = revisions[0] if revisions else None
+    recorded = current is not None
+
+    if periods.is_open_month(resolved_month, settings):
+        allocation_status: schemas.AllocationStatus = "LIVE"
+        allocated: int | None = entitlements.allocated_for_month(db, tenant)
+        if current is not None:
+            remaining: int | None = max(0, current.total_limit - allocated)
+            over_allocated: int | None = max(0, allocated - current.total_limit)
+        else:
+            remaining = None
+            over_allocated = None
+    else:
+        allocation_status = "NOT_SNAPSHOTTED"
+        allocated = None
+        remaining = None
+        over_allocated = None
+
+    return schemas.MonthlyBudgetOut(
+        month=periods.format_month(resolved_month),
+        status="RECORDED" if recorded else "NOT_RECORDED",
+        status_label="Đã ghi nhận" if recorded else "chưa ghi nhận",
+        current=current,
+        revisions=revisions,
+        allocation_status=allocation_status,
+        allocated=allocated,
+        remaining=remaining,
+        over_allocated=over_allocated,
+    )
+
+
+def budget(
+    db: Session,
+    authority: ActorAuthority,
+    params: schemas.MonthQuery,
+    settings: Settings,
+) -> schemas.MonthlyBudgetOut:
+    """Read institutional monthly budget revisions and allocation status (GLOBAL qta.read only)."""
+    tenant = reader(authority)
+    resolved_month = periods.resolve_month(params.month, settings, open_only=False)
+    return budget_for_tenant(db, tenant, resolved_month, settings)
+
+
+def _event_out(row: QtaEvent) -> schemas.QtaEventOut:
+    return schemas.QtaEventOut(
+        id=row.id,
+        month=periods.format_month(row.period_month),
+        event_type=row.event_type,
+        user_id=row.user_id,
+        actor_id=row.actor_id,
+        summary=row.summary,
+        occurred_at=row.occurred_at,
+    )
+
+
+def events(
+    db: Session,
+    authority: ActorAuthority,
+    params: schemas.QtaEventFilters,
+    settings: Settings,
+) -> Page[schemas.QtaEventOut]:
+    """List append-only QTA events for a calendar month (GLOBAL qta.read, newest first)."""
+    tenant = reader(authority)
+    resolved_month = periods.resolve_month(params.month, settings, open_only=False)
+    statement = sa.select(QtaEvent).where(
+        QtaEvent.institution_id == tenant,
+        QtaEvent.period_month == resolved_month,
+    )
+    if params.event_type is not None:
+        statement = statement.where(QtaEvent.event_type == params.event_type)
+    if params.user_id is not None:
+        statement = statement.where(QtaEvent.user_id == params.user_id)
+    return page(
+        db,
+        statement.order_by(QtaEvent.occurred_at.desc(), QtaEvent.id.desc()),
+        params,
+        _event_out,
+    )
+
+
+def monthly_reset_out(row: QtaMonthlyReset) -> schemas.MonthlyResetOut:
+    return schemas.MonthlyResetOut(
+        id=row.id,
+        month=periods.format_month(row.period_month),
+        trigger_mode=row.trigger_mode,
+        triggered_by=row.triggered_by,
+        executed_at=row.executed_at,
+    )
+
+
+def monthly_resets(
+    db: Session,
+    authority: ActorAuthority,
+    params: PageParams,
+    settings: Settings,
+) -> schemas.MonthlyResetsOut:
+    """List monthly reset history newest-first plus current month status (GLOBAL qta.read)."""
+    tenant = reader(authority)
+    cur_month = periods.current_month(settings)
+    cur_row = db.scalar(
+        sa.select(QtaMonthlyReset).where(
+            QtaMonthlyReset.institution_id == tenant,
+            QtaMonthlyReset.period_month == cur_month,
+        )
+    )
+    current = schemas.CurrentMonthlyResetOut(
+        month=periods.format_month(cur_month),
+        status="COMPLETED" if cur_row is not None else "PENDING",
+        reset=monthly_reset_out(cur_row) if cur_row is not None else None,
+    )
+
+    statement = (
+        sa.select(QtaMonthlyReset)
+        .where(QtaMonthlyReset.institution_id == tenant)
+        .order_by(
+            QtaMonthlyReset.period_month.desc(),
+            QtaMonthlyReset.executed_at.desc(),
+            QtaMonthlyReset.id.desc(),
+        )
+    )
+    paged = page(db, statement, params, monthly_reset_out)
+    return schemas.MonthlyResetsOut(
+        current=current,
+        items=paged.items,
+        total=paged.total,
+        limit=paged.limit,
+        offset=paged.offset,
+    )

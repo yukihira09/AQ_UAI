@@ -1,6 +1,6 @@
 # QTA architecture and decisions (Phase 4 · Module 2)
 
-**Status:** **Q0** (planning), **Q1** (initial RBAC catalog `0007` and schema `0008`), and **Q1-R** (schema and plan revision addressing [QTA_Q1_REVIEW.md](QTA_Q1_REVIEW.md) findings F1–F11 and Project Owner decisions **PD-Q1..PD-Q6**) are implemented in source. **No formal external Tech Lead or institutional sign-off is claimed.**
+**Status:** **Q0** (planning), **Q1** (initial RBAC catalog `0007` and schema `0008`), **Q1-R** (schema and plan revision addressing [QTA_Q1_REVIEW.md](QTA_Q1_REVIEW.md) findings F1–F11 and Project Owner decisions **PD-Q1..PD-Q6**), **Q2** (registry, sync, specialist groups & group × model quotas), **Q3** (live additive entitlements, lookup & append-only monthly budgets), and **Q4** (individual kill-switch/restore, `check_ai_access`, events, monthly reset API/CLI & carry-over fixes C1–C4; see [QTA_Q4_REPORT.md](reports/QTA_Q4_REPORT.md)) are implemented in source. **No formal external Tech Lead or institutional sign-off is claimed.**
 
 Canonical FRD: [AQ-FRD-UAI-QTA-001](../frd/AQ-FRD-UAI-QTA-001.md) · Plan: [QTA_IMPLEMENTATION_PLAN](QTA_IMPLEMENTATION_PLAN.md) · Open decisions: [QTA_OPEN_DECISIONS](QTA_OPEN_DECISIONS.md) · Traceability: [QTA_REQUIREMENTS_TRACEABILITY](QTA_REQUIREMENTS_TRACEABILITY.md) · ADR: [ADR-0004](../architecture/ADR-0004-qta.md).
 
@@ -75,18 +75,25 @@ Assume Institution $I$ has two active models (`M1`, `M2`), two `ACTIVE` users (`
 
 ---
 
-### 2.2 Paid external model scope (`PD-Q2`, `QD9`)
+### 2.2 Paid external model scope & fail-closed access decision table (`PD-Q2`, `QD9`, `R5`, `R6`, `R9`)
 
 - Per **Project Owner decision `PD-Q2`** (2026-11-26), `PAID_EXTERNAL_ONLY` (*chỉ mô hình bên ngoài mất phí*) applies to **all models whose provider has `provider_type == 'EXTERNAL'`**.
+- Per **`R6`** (Stage Q4 carry-over `C1`), a model is **usable** in QTA iff `mdl_models.active AND mdl_providers.active` (joined on `(institution_id, provider_id)`).
 - **No MDL schema or code change is made** (read-only access to `mdl_models` and `mdl_providers`).
-- **Enforcement matrix under `check_ai_access(db, institution_id, user_id, model_id)` (Stage Q4):**
+- **Ordered fail-closed decision table (`check_ai_access(db, institution_id, user_id, model_id)` in `qta/access.py`, `R5` / `R9`):**
+  Every access-decision and exclusion reason code uses `UPPER_SNAKE` (`R9`). When several failure conditions hold simultaneously, the earliest rule wins:
 
-| Active suspension scope | Model `provider_type` | Access decision | Reason code |
-| --- | --- | --- | --- |
-| *(None / expired / restored)* | `INTERNAL` or `EXTERNAL` | **ALLOWED** | — |
-| `ALL_MODELS` | `INTERNAL` or `EXTERNAL` | **BLOCKED** | `suspended_all_models` |
-| `PAID_EXTERNAL_ONLY` | `INTERNAL` | **ALLOWED** | — |
-| `PAID_EXTERNAL_ONLY` | `EXTERNAL` | **BLOCKED** | `suspended_paid_external` |
+| Priority | Condition | `allowed` | `reason` | `suspension_id` |
+| --- | --- | --- | --- | --- |
+| 1 | User missing or in another institution | `false` | `USER_NOT_FOUND` | `null` |
+| 2 | `User.state != 'ACTIVE'` (`PENDING` / `DISABLED`) | `false` | `USER_NOT_ACTIVE` | `null` |
+| 3 | Model missing, other institution, or not usable (`!(mdl_models.active && mdl_providers.active)`, `R6`) | `false` | `MODEL_UNAVAILABLE` | `null` |
+| 4 | Active suspension with `scope == 'ALL_MODELS'` | `false` | `SUSPENDED_ALL_MODELS` | `<active_suspension.id>` |
+| 5 | Active suspension with `scope == 'PAID_EXTERNAL_ONLY'` and `provider_type == 'EXTERNAL'` | `false` | `SUSPENDED_PAID_EXTERNAL` | `<active_suspension.id>` |
+| 6 | Live additive `base_entitlement(user, model) == 0` (`FR-QTA-031 AC2`, `R5`) | `false` | `NO_ENTITLEMENT` | `null` |
+| 7 | Otherwise | `true` | `null` | `null` |
+
+- **Gateway contract:** A future AI invocation gateway must call **both** `mdl.routing.effective_model_id` (which model is eligible to serve) and `qta.access.check_ai_access` (whether this user may invoke it). Consumption is not checked while `consumption_status == "NOT_INTEGRATED"`.
 
 ---
 
@@ -113,7 +120,7 @@ QTA strictly separates four concepts and **never fabricates consumption or deduc
   - `expires_at` (`TIMESTAMPTZ NULL`) is **optional**: `NULL` means active until explicitly restored. If provided, it must be finite and strictly greater than `suspended_at` (no maximum duration cap).
   - **Lazy expiry enforcement:** A suspension is active iff it has no row in `qta_suspension_restorations` **and** `(expires_at IS NULL OR expires_at > now())`.
 - **Target & balance preservation (`SPEC` + `PROV`):**
-  - Target must belong to the same institution and have `User.state == 'ACTIVE'` (`PROV`).
+  - Target must belong to the same institution (else `404`); **any account state** (`PENDING` / `ACTIVE` / `DISABLED`) is accepted, because quota status is independent of directory account state (`PROV` — reviewer decision in the Q4 prompt §4.2, implemented in Q4; replaces the earlier Q1-R "`User.state == 'ACTIVE'`" rule). A non-`ACTIVE` user is already blocked by `check_ai_access` (`USER_NOT_ACTIVE`), so a suspension on such a user only takes effect if the account is later activated.
   - Single active suspension per user (`409 QTA_USER_ALREADY_SUSPENDED`).
   - Restore (`FR-QTA-041`) requires an active suspension (`409 QTA_USER_NOT_SUSPENDED`), inserts an immutable `qta_suspension_restorations` row + `qta_events(RESTORE)` + `qta.user_restored`, and never adds quota. Neither suspend nor restore alters balances.
 
@@ -121,11 +128,12 @@ QTA strictly separates four concepts and **never fabricates consumption or deduc
 
 ### 2.5 Monthly reset & group synchronization (`PD-Q6`, `QD2`, `QD4`, `QD8`, `F3`, `F4`)
 
-1. **Monthly reset (`FR-QTA-032`, `FR-QTA-050`, `RULE-QTA-01`, `PD-Q6`):**
+1. **Monthly reset (`FR-QTA-032`, `FR-QTA-050`, `RULE-QTA-01`, `PD-Q6`, `R7`, `R8`):**
    - **Timezone (`REC`):** Institution calendar month uses **`Asia/Ho_Chi_Minh` (UTC+07:00)** (configurable via `AQ_UAI_INSTITUTION_TIMEZONE`, validated with `zoneinfo.ZoneInfo`). DB timestamps stay UTC `timestamptz`.
-   - **Scheduled CLI:** `python -m aq_uai_api.qta.reset` (`trigger_mode='SCHEDULED'`, `triggered_by=NULL`) records `qta_monthly_resets` + `qta_events(MONTHLY_REFRESH)` + operator audit `qta.monthly_reset_scheduled`. Idempotent no-op (exit 0) if the month is already recorded.
-   - **Manual simulation (`PO` — `PD-Q6`):** `POST /api/v1/qta/monthly-resets` (`trigger_mode='MANUAL_SIMULATION'`, `triggered_by=authority.actor_id`) is permitted for the **current month only** (`Asia/Ho_Chi_Minh`) — never a future month, so it cannot pre-empt the real `00:00` day-1 run. Repeat returns `409 QTA_RESET_ALREADY_EXECUTED`.
-   - **Idempotency, missed resets & zero rollover:** Enforced structurally by `UNIQUE(institution_id, period_month)` + `QTA_RESET_NAMESPACE`. Crossing `00:00` day 1 automatically scopes queries to the new `period_month` (zero rollover even if cron missed); late catch-up writes real `executed_at` without backdating; `GET /qta/monthly-resets` reports current-month `COMPLETED` vs `PENDING`. Monthly resets never lift active disciplinary suspensions.
+   - **Honest append-only ledger marker (`R7`):** Because consumption metering is `NOT_INTEGRATED` and no per-user balance rows exist in Phase 4, the monthly reset records one immutable `qta_monthly_resets` row + one `qta_events(MONTHLY_REFRESH)` row + typed audit event per `(institution_id, period_month)` without fabricating per-user balance rows. Zero rollover holds by construction because entitlements are derived live from current configuration (`FR-QTA-032 AC2`).
+   - **Scheduled CLI (`R8`):** `python -m aq_uai_api.qta.reset` (`trigger_mode='SCHEDULED'`, `triggered_by=NULL`) records **only the current institution month** (one transaction per institution, printing `recorded=N already=M`). It never backfills missed past months and is an idempotent no-op (exit 0) if the current month is already recorded.
+   - **Manual simulation (`PO` — `PD-Q6`):** `POST /api/v1/qta/monthly-resets` (`trigger_mode='MANUAL_SIMULATION'`, `triggered_by=authority.actor_id`, empty body only) is permitted for the **current month only** (`Asia/Ho_Chi_Minh`) — never a future month, so it cannot pre-empt the real `00:00` day-1 run. Repeat returns `409 QTA_RESET_ALREADY_EXECUTED`.
+   - **Idempotency, missed resets & zero rollover:** Enforced structurally by `UNIQUE(institution_id, period_month)` + `QTA_RESET_NAMESPACE`. Crossing `00:00` day 1 automatically scopes queries to the new `period_month` (zero rollover even if cron missed); late catch-up within the same month writes real `executed_at` without backdating; `GET /qta/monthly-resets` reports current-month `COMPLETED` vs `PENDING`. Monthly resets never alter quotas, budgets, or memberships and never lift active disciplinary suspensions.
 2. **Group registry, synchronization & specialist-group reuse (`FR-QTA-001 AC2`, `FR-QTA-020`, `FR-QTA-022`, `RULE-QTA-05`, `F3`, `F4`):**
    - **Before the first sync:** `qta_quota_groups` is empty, so `GET /qta/groups` honestly returns an empty list (`FR-QTA-001 AC2`).
    - **Sync (`POST /api/v1/qta/groups/sync`):** Inside one `protected()` transaction (`qta.manage`), reconciles `qta_quota_groups` against Phase 2 `account_groups(kind='SYSTEM')`:
@@ -171,13 +179,13 @@ Lock order: institution advisory lock (`INSTITUTION_NAMESPACE = 41001`) → acco
 
 ---
 
-## 5. Planned REST API surface (`/api/v1/qta`)
+## 5. Implemented REST API surface (`/api/v1/qta`, Stages Q2–Q4)
 
-All `GET` routes require `qta.read` (GLOBAL for budgets/groups/models/events/resets; GLOBAL or exact-UNIT for user lookup). All writes require direct GLOBAL `qta.manage` + session + exact Origin + CSRF.
+All `GET` routes require `qta.read` (GLOBAL for budgets/groups/models/events/resets; GLOBAL or exact-UNIT for user lookup and user suspension history). All writes require direct GLOBAL `qta.manage` + session + exact Origin + CSRF.
 
 | Method & Path | Permission | Stage | Purpose |
 | --- | --- | --- | --- |
-| `GET /qta/models` | `qta.read` | Q2 | Active models from `mdl_models` (with `provider_type`) |
+| `GET /qta/models` | `qta.read` | Q2 (C1 in Q4) | Usable models (`mdl_models.active AND mdl_providers.active`) with `provider_type` |
 | `GET /qta/groups` | GLOBAL `qta.read` | Q2 | List enrolled groups in `qta_quota_groups` (empty before first sync) with `origin`, `in_directory`, active member counts, and per-model quotas |
 | `POST /qta/groups/sync` | GLOBAL `qta.manage` | Q2 | Reconcile `SYSTEM` groups from Phase 2 directory into `qta_quota_groups`; preserve `SPECIALIST` groups & existing quotas (`FR-QTA-020`) |
 | `GET /qta/groups/sync-runs` | GLOBAL `qta.read` | Q2 | Append-only sync history (`groups_added`, `groups_retired`, counts) |
@@ -188,16 +196,17 @@ All `GET` routes require `qta.read` (GLOBAL for budgets/groups/models/events/res
 | `GET /qta/groups/{group_id}/members` | GLOBAL `qta.read` | Q2 | Paginated live directory memberships for an enrolled group |
 | `PUT /qta/groups/{group_id}/members/{user_id}` | GLOBAL `qta.manage` | Q2 | Add/reactivate member in an active `AI_SPECIALIST` group via `directory.service.set_membership` |
 | `DELETE /qta/groups/{group_id}/members/{user_id}` | GLOBAL `qta.manage` | Q2 | Deactivate member in an `AI_SPECIALIST` group via `directory.service.set_membership` |
-| `PUT /qta/groups/{group_id}/quotas` | GLOBAL `qta.manage` | Q2 | Upsert per-model monthly quota rules (`enabled`, `monthly_limit`, `warning_threshold_pct`) for an enrolled group (`FR-QTA-021`) |
+| `PUT /qta/groups/{group_id}/quotas` | GLOBAL `qta.manage` | Q2 (C1/C3 in Q4) | Upsert per-model monthly quota rules (`enabled`, `monthly_limit`, `warning_threshold_pct`) for an enrolled group (`FR-QTA-021`) |
 | `GET /qta/budgets?month=YYYY-MM` | GLOBAL `qta.read` | Q3 | Current (highest-revision) monthly cap or `"chưa ghi nhận"`, revision history, `allocated`, `remaining`, `over_allocated` warning |
 | `PUT /qta/budgets/{month}` | GLOBAL `qta.manage` | Q3 | Append a new `qta_budget_revisions` row for current or next month only, with required `decision_number` + `decision_date`; rejects `total_limit < allocated` (`409` + `{allocated, deficit}`) |
-| `GET /qta/users` | In-scope `qta.read` | Q3 | Search users in caller's GLOBAL or UNIT scope for lookup |
-| `GET /qta/users/{user_id}/entitlements?month=YYYY-MM` | In-scope `qta.read` | Q3 | Enrolled qualifying groups, additive per-model breakdown & `base_entitlement` (*đơn vị hạn mức*), `actual_consumption: null`, `remaining_quota: null`, `consumption_status: "NOT_INTEGRATED"`, plus (from Q4) active suspension & per-model access evaluation |
-| `POST /qta/users/{user_id}/suspensions` | GLOBAL `qta.manage` | Q4 | Kill-switch (`ALL_MODELS` \| `PAID_EXTERNAL_ONLY`), mandatory `reason` & `ordered_by`, optional finite future `expires_at`; operator from session; preserves balance (`FR-QTA-040`) |
-| `POST /qta/users/{user_id}/restore` | GLOBAL `qta.manage` | Q4 | Restore suspended user to `ACTIVE` without adding quota (`FR-QTA-041`) |
-| `GET /qta/events?month=YYYY-MM` | GLOBAL `qta.read` | Q4 | Append-only QTA events (`MONTHLY_REFRESH`, `SUSPEND`, `RESTORE`); no edit/delete (`FR-QTA-050`) |
-| `GET /qta/monthly-resets` | GLOBAL `qta.read` | Q4 | Append-only monthly reset history + current-month `COMPLETED`/`PENDING` status |
-| `POST /qta/monthly-resets` | GLOBAL `qta.manage` | Q4 | Manual monthly reset simulation for **current month only** (`Asia/Ho_Chi_Minh`, `PD-Q6`, `FR-QTA-032`) |
+| `GET /qta/users` | In-scope `qta.read` | Q3–Q4 | Search users in caller's GLOBAL or UNIT scope for lookup, including `quota_status` (`ACTIVE` \| `SUSPENDED`) without N+1 |
+| `GET /qta/users/{user_id}/entitlements?month=YYYY-MM` | In-scope `qta.read` | Q3–Q4 | Enrolled qualifying groups, additive per-model breakdown & `base_entitlement` (*đơn vị hạn mức*), `actual_consumption: null`, `remaining_quota: null`, `consumption_status: "NOT_INTEGRATED"`, `quota_status`, active `suspension`, and per-model `access: {allowed, reason}` |
+| `GET /qta/users/{user_id}/suspensions` | In-scope `qta.read` | Q4 (done) | Paginated suspension history newest-first with computed `ACTIVE` \| `EXPIRED` \| `RESTORED` status and restoration metadata |
+| `POST /qta/users/{user_id}/suspensions` | GLOBAL `qta.manage` | Q4 (done) | Kill-switch (`ALL_MODELS` \| `PAID_EXTERNAL_ONLY`), mandatory `reason` & `ordered_by`, optional finite future `expires_at`; operator from session; preserves balance (`FR-QTA-040`) |
+| `POST /qta/users/{user_id}/restore` | GLOBAL `qta.manage` | Q4 (done) | Restore suspended user to `ACTIVE` without adding quota (`FR-QTA-041`) |
+| `GET /qta/events?month=YYYY-MM` | GLOBAL `qta.read` | Q4 (done) | Append-only QTA events (`MONTHLY_REFRESH`, `SUSPEND`, `RESTORE`) with `event_type` & `user_id` filters; no edit/delete (`FR-QTA-050`) |
+| `GET /qta/monthly-resets` | GLOBAL `qta.read` | Q4 (done) | Append-only monthly reset history + current-month `COMPLETED`/`PENDING` status |
+| `POST /qta/monthly-resets` | GLOBAL `qta.manage` | Q4 (done) | Manual monthly reset simulation (empty body; **current month only** in `Asia/Ho_Chi_Minh`, `PD-Q6`, `FR-QTA-032`) |
 
 ---
 

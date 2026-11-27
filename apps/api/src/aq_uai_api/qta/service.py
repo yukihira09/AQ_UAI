@@ -1,8 +1,9 @@
-"""Protected QTA writes (Phase 4, Stage Q2): sync, AI-specialist groups, and group × model quotas.
+"""Protected QTA writes (Phase 4, Stages Q2–Q4): sync, specialist groups, quotas, budgets, kill-switch & reset.
 
 Every write executes inside the shared ``protected`` transaction (session, exact Origin,
 CSRF, transaction-time ``qta.manage`` re-authorization) and records its typed audit event
-in the same transaction so audit failure rolls back the mutation.
+(plus any ``qta_events`` ledger row) in the same transaction so audit failure rolls back
+the mutation.
 
 AI-specialist group lifecycle writes delegate directly to ``directory.service`` inner
 functions (``create_group_in_tx``, ``update_group_in_tx``, ``set_group_active_in_tx``,
@@ -26,11 +27,22 @@ from aq_uai_api.db.identity import AccountGroup, GroupMembership, User
 from aq_uai_api.directory import schemas as dir_schemas
 from aq_uai_api.directory import service as dir_service
 from aq_uai_api.directory.queries import one
-from aq_uai_api.mdl.models import MdlModel
-from aq_uai_api.qta import queries, schemas
-from aq_uai_api.qta.models import QtaGroupModelQuota, QtaGroupSyncRun, QtaQuotaGroup
+from aq_uai_api.mdl.models import MdlModel, MdlProvider
+from aq_uai_api.qta import access, entitlements, periods, queries, reset, schemas
+from aq_uai_api.qta.models import (
+    QtaBudgetRevision,
+    QtaEvent,
+    QtaGroupModelQuota,
+    QtaGroupSyncRun,
+    QtaQuotaGroup,
+    QtaSuspension,
+    QtaSuspensionRestoration,
+)
 
 QTA_SYNC_NAMESPACE = 52000
+QTA_BUDGET_NAMESPACE = 52001
+QTA_SUSPENSION_NAMESPACE = access.QTA_SUSPENSION_NAMESPACE
+QTA_RESET_NAMESPACE = reset.QTA_RESET_NAMESPACE
 
 
 def _manager(authority: ActorAuthority) -> UUID:
@@ -344,7 +356,7 @@ def set_specialist_membership(
 def upsert_group_quotas(
     context: WriteContext, group_id: UUID, payload: schemas.UpsertGroupQuotas
 ) -> schemas.QtaGroupOut:
-    """Upsert per-model monthly quotas for one active enrolled group (FR-QTA-021).
+    """Upsert per-model monthly quotas for one active enrolled group (FR-QTA-021, C1, C3).
 
     Never deletes unmentioned rows; audits only rows that actually changed.
     """
@@ -370,9 +382,16 @@ def upsert_group_quotas(
 
         requested_ids = sorted({item.model_id for item in payload.quotas})
         found_models = {
-            model.id: model
-            for model in db.scalars(
-                sa.select(MdlModel)
+            model_id: bool(usable)
+            for model_id, usable in db.execute(
+                sa.select(MdlModel.id, entitlements.usable_model_predicate())
+                .join(
+                    MdlProvider,
+                    sa.and_(
+                        MdlProvider.id == MdlModel.provider_id,
+                        MdlProvider.institution_id == MdlModel.institution_id,
+                    ),
+                )
                 .where(
                     MdlModel.institution_id == tenant,
                     MdlModel.id.in_(requested_ids),
@@ -381,10 +400,10 @@ def upsert_group_quotas(
             ).all()
         }
         for model_id in requested_ids:
-            model = found_models.get(model_id)
-            if model is None:
+            usable = found_models.get(model_id)
+            if usable is None:
                 raise DomainError(ErrorCode.NOT_FOUND)
-            if not model.active:
+            if not usable:
                 raise DomainError(ErrorCode.QTA_MODEL_NOT_ELIGIBLE)
 
         existing = {
@@ -429,6 +448,7 @@ def upsert_group_quotas(
                         after_enabled=item.enabled,
                         before_limit=None,
                         after_limit=item.monthly_limit,
+                        before_warning_threshold_pct=None,
                         warning_threshold_pct=item.warning_threshold_pct,
                     ),
                 )
@@ -443,6 +463,7 @@ def upsert_group_quotas(
 
             before_enabled = row.enabled
             before_limit = row.monthly_limit
+            before_threshold = row.warning_threshold_pct
             row.enabled = item.enabled
             row.monthly_limit = item.monthly_limit
             row.warning_threshold_pct = item.warning_threshold_pct
@@ -462,8 +483,231 @@ def upsert_group_quotas(
                     after_enabled=item.enabled,
                     before_limit=before_limit,
                     after_limit=item.monthly_limit,
+                    before_warning_threshold_pct=before_threshold,
                     warning_threshold_pct=item.warning_threshold_pct,
                 ),
             )
 
         return queries.group_detail_for_tenant(db, tenant, group.id)
+
+
+def record_budget_revision(
+    context: WriteContext, month: str, payload: schemas.SetMonthlyBudget
+) -> schemas.MonthlyBudgetOut:
+    """Append an immutable monthly budget revision (FR-QTA-010, FR-QTA-011, INV-18, PD-Q1/PD-Q4).
+
+    Serialized per institution with ``QTA_BUDGET_NAMESPACE``. Rejects reducing ``total_limit``
+    below live ``allocated_for_month`` with ``409 QTA_BUDGET_BELOW_ALLOCATED`` and exact
+    ``{allocated, deficit}`` details. Never mutates or deletes prior revisions.
+    """
+    with protected(context, changes_authority=False) as (db, authority):
+        tenant = _manager(authority)
+        resolved_month = periods.resolve_month(month, context.settings, open_only=True)
+        database_lock(db, QTA_BUDGET_NAMESPACE, institution_key(tenant), shared=False)
+
+        allocated = entitlements.allocated_for_month(db, tenant)
+        if payload.total_limit < allocated:
+            raise DomainError(
+                ErrorCode.QTA_BUDGET_BELOW_ALLOCATED,
+                {"allocated": allocated, "deficit": allocated - payload.total_limit},
+            )
+
+        previous = db.scalar(
+            sa.select(QtaBudgetRevision)
+            .where(
+                QtaBudgetRevision.institution_id == tenant,
+                QtaBudgetRevision.period_month == resolved_month,
+            )
+            .order_by(QtaBudgetRevision.revision.desc())
+            .limit(1)
+        )
+        next_revision = (previous.revision + 1) if previous is not None else 1
+
+        row = QtaBudgetRevision(
+            institution_id=tenant,
+            period_month=resolved_month,
+            revision=next_revision,
+            total_limit=payload.total_limit,
+            decision_number=payload.decision_number,
+            decision_date=payload.decision_date,
+            recorded_by=authority.actor_id,
+        )
+        db.add(row)
+        try:
+            db.flush()
+        except IntegrityError as exc:
+            if getattr(exc.orig, "sqlstate", None) == "23505":
+                raise DomainError(ErrorCode.CONFLICT) from None
+            raise
+
+        record(
+            db,
+            context,
+            authority,
+            audit.AuditAction.QTA_MONTHLY_BUDGET_SET,
+            row.id,
+            audit.BudgetRevisionRecorded(
+                period_month=resolved_month,
+                revision=next_revision,
+                before_limit=previous.total_limit if previous is not None else None,
+                after_limit=row.total_limit,
+                before_decision_number=(
+                    previous.decision_number if previous is not None else None
+                ),
+                decision_number=row.decision_number,
+                decision_date=row.decision_date,
+            ),
+        )
+        return queries.budget_for_tenant(db, tenant, resolved_month, context.settings)
+
+
+def suspend_user(
+    context: WriteContext, user_id: UUID, payload: schemas.SuspendUser
+) -> schemas.SuspensionOut:
+    """Suspend an account's AI access without altering quota rules (FR-QTA-040, PD-Q2/PD-Q3).
+
+    Lock order: institution shared lock -> sorted account locks (actor + target) via
+    ``protected`` -> ``QTA_SUSPENSION_NAMESPACE`` exclusive lock. Operator ``suspended_by``
+    is ALWAYS ``authority.actor_id`` (never from client input).
+    """
+    with protected(
+        context, changes_authority=False, user_id=user_id, permission=P.QTA_MANAGE
+    ) as (db, authority):
+        tenant = _manager(authority)
+        target = one(
+            db,
+            sa.select(User).where(
+                User.institution_id == tenant,
+                User.id == user_id,
+            ),
+        )
+        now = periods.utc_now()
+        if payload.expires_at is not None and payload.expires_at <= now:
+            raise DomainError(ErrorCode.VALIDATION_FAILED)
+
+        database_lock(db, QTA_SUSPENSION_NAMESPACE, institution_key(tenant), shared=False)
+        if access.active_suspension_for_user(db, tenant, target.id, now=now) is not None:
+            raise DomainError(ErrorCode.QTA_USER_ALREADY_SUSPENDED)
+
+        row = QtaSuspension(
+            institution_id=tenant,
+            user_id=target.id,
+            scope=payload.scope,
+            reason=payload.reason,
+            ordered_by=payload.ordered_by,
+            expires_at=payload.expires_at,
+            suspended_by=authority.actor_id,
+        )
+        db.add(row)
+        try:
+            db.flush()
+        except IntegrityError as exc:
+            sqlstate = getattr(exc.orig, "sqlstate", None)
+            constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
+            if sqlstate == "23514" and constraint == "ck_qta_suspensions_expiry":
+                raise DomainError(ErrorCode.VALIDATION_FAILED) from None
+            raise
+
+        event = QtaEvent(
+            institution_id=tenant,
+            period_month=periods.current_month(context.settings),
+            event_type="SUSPEND",
+            user_id=target.id,
+            actor_id=authority.actor_id,
+            summary=f"Tạm ngưng quyền dùng AI ({row.scope})",
+        )
+        db.add(event)
+        db.flush()
+
+        record(
+            db,
+            context,
+            authority,
+            audit.AuditAction.QTA_USER_SUSPENDED,
+            row.id,
+            audit.UserSuspended(
+                user_id=target.id,
+                scope=row.scope,
+                ordered_by=row.ordered_by,
+                expires_at=row.expires_at,
+            ),
+        )
+        return access.suspension_out(row, None, now=now)
+
+
+def restore_user(
+    context: WriteContext, user_id: UUID, payload: schemas.RestoreUser
+) -> schemas.SuspensionOut:
+    """Restore an account's active AI suspension without adding quota (FR-QTA-041)."""
+    with protected(
+        context, changes_authority=False, user_id=user_id, permission=P.QTA_MANAGE
+    ) as (db, authority):
+        tenant = _manager(authority)
+        target = one(
+            db,
+            sa.select(User).where(
+                User.institution_id == tenant,
+                User.id == user_id,
+            ),
+        )
+        database_lock(db, QTA_SUSPENSION_NAMESPACE, institution_key(tenant), shared=False)
+        now = periods.utc_now()
+        active_susp = access.active_suspension_for_user(db, tenant, target.id, now=now)
+        if active_susp is None:
+            raise DomainError(ErrorCode.QTA_USER_NOT_SUSPENDED)
+
+        restoration = QtaSuspensionRestoration(
+            suspension_id=active_susp.id,
+            institution_id=tenant,
+            restored_by=authority.actor_id,
+            note=payload.note,
+        )
+        db.add(restoration)
+        try:
+            db.flush()
+        except IntegrityError as exc:
+            if getattr(exc.orig, "sqlstate", None) == "23505":
+                raise DomainError(ErrorCode.QTA_USER_NOT_SUSPENDED) from None
+            raise
+
+        event = QtaEvent(
+            institution_id=tenant,
+            period_month=periods.current_month(context.settings),
+            event_type="RESTORE",
+            user_id=target.id,
+            actor_id=authority.actor_id,
+            summary="Khôi phục quyền dùng AI",
+        )
+        db.add(event)
+        db.flush()
+
+        record(
+            db,
+            context,
+            authority,
+            audit.AuditAction.QTA_USER_RESTORED,
+            active_susp.id,
+            audit.UserRestored(
+                user_id=target.id,
+                suspension_id=active_susp.id,
+            ),
+        )
+        return access.suspension_out(active_susp, restoration, now=now)
+
+
+def simulate_monthly_reset(context: WriteContext) -> schemas.MonthlyResetOut:
+    """Record a manual monthly reset marker for the current institution month only (PD-Q6)."""
+    with protected(context, changes_authority=False) as (db, authority):
+        tenant = _manager(authority)
+        month = periods.current_month(context.settings)
+        outcome = reset.record_reset(
+            db,
+            tenant,
+            month,
+            "MANUAL_SIMULATION",
+            authority.actor_id,
+            context.request_id,
+        )
+        if not outcome.recorded:
+            raise DomainError(ErrorCode.QTA_RESET_ALREADY_EXECUTED)
+        return queries.monthly_reset_out(outcome.reset)

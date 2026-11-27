@@ -155,8 +155,9 @@ def process(command, log, *, env=None):
 
 
 def wait_for_http(port, server, log, host="127.0.0.1", path="/api/v1/health"):
+    deadline = time.monotonic() + 30.0
     with httpx.Client(trust_env=False, timeout=1) as client:
-        for _ in range(100):
+        while time.monotonic() < deadline:
             if server.poll() is not None:
                 break
             try:

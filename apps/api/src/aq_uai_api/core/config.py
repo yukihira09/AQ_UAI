@@ -1,8 +1,9 @@
 """Process configuration. Database credentials are never sent to clients or logs."""
 
 from functools import lru_cache
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import URL
 
@@ -32,6 +33,19 @@ class Settings(BaseSettings):
     # M5 review: optional PEM CA bundle (a path inside the api container) trusted in
     # addition to the system store, for INTERNAL https providers only.
     mdl_egress_internal_ca_file: str = ""
+    # QTA (Phase 4, Q3): institutional calendar timezone for month boundaries (QD2).
+    institution_timezone: str = "Asia/Ho_Chi_Minh"
+
+    @field_validator("institution_timezone")
+    @classmethod
+    def _validate_institution_timezone(cls, value: str) -> str:
+        if not isinstance(value, str) or not value or value != value.strip():
+            raise ValueError("institution_timezone must be a valid IANA time zone name.")
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            raise ValueError("institution_timezone must be a valid IANA time zone name.") from exc
+        return value
 
     @property
     def database_url(self) -> URL:

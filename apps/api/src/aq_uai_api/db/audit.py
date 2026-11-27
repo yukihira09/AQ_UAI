@@ -268,6 +268,7 @@ class GroupQuotaUpdated(_AuditChanges):
     after_enabled: bool
     before_limit: int | None = Field(default=None, ge=0)
     after_limit: int = Field(ge=0)
+    before_warning_threshold_pct: int | None = Field(default=None, ge=1, le=100)
     warning_threshold_pct: int | None = Field(default=None, ge=1, le=100)
 
 
