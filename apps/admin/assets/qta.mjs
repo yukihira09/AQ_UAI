@@ -20,7 +20,7 @@ const groupKindLabels = { SYSTEM: 'Hệ thống', AI_SPECIALIST: 'AI chuyên bi�
 const originLabels = { SYNC: 'Đồng bộ danh bạ', SPECIALIST: 'Tạo trong QTA' };
 const providerTypeLabels = { EXTERNAL: 'Ngoài trường', INTERNAL: 'Nội bộ' };
 const accountStateLabels = { ACTIVE: 'Đang hoạt động', PENDING: 'Chờ kích hoạt', DISABLED: 'Đã vô hiệu hóa' };
-const quotaStatusLabels = { ACTIVE: 'Đang hoạt động', SUSPENDED: 'Đang tạm ngưng' };
+const quotaStatusLabels = { ACTIVE: 'Được dùng AI', SUSPENDED: 'ĐÃ CẮT' };
 const scopeLabels = {
   ALL_MODELS: 'Toàn bộ mô hình AI',
   PAID_EXTERNAL_ONLY: 'Chỉ mô hình ngoài trường (trả phí)',
@@ -42,7 +42,7 @@ const accessReasonLabels = {
   MODEL_UNAVAILABLE: 'Mô hình không khả dụng',
   SUSPENDED_ALL_MODELS: 'Tạm ngưng toàn bộ mô hình',
   SUSPENDED_PAID_EXTERNAL: 'Tạm ngưng mô hình ngoài trường',
-  NO_ENTITLEMENT: 'Không có hạn mức (NO_ENTITLEMENT)',
+  NO_ENTITLEMENT: 'Không có hạn mức',
 };
 const eventTypeLabels = {
   MONTHLY_REFRESH: 'Làm mới đầu tháng',

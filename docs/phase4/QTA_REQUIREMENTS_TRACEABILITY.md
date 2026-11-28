@@ -4,21 +4,21 @@ Maps every `Must` requirement, acceptance criterion (AC), `Should` item, and `RU
 
 ## Coverage summary
 
-| FR ID | Title | Priority | ACs | Stages | Status (2026-11-27, Q5) |
+| FR ID | Title | Priority | ACs | Stages | Status (2026-11-27, Q6) |
 | --- | --- | --- | --- | --- | --- |
-| `FR-QTA-001` | Truy cập theo quyền | Must | 2 | Q1, Q1-R, Q2, Q3, Q4, Q5 | Implemented & verified in API + `#qta` UI (Q5 RBAC & UNIT-viewer lookup-only Playwright verified); not formally accepted |
-| `FR-QTA-010` | Tổng hạn mức nhà trường theo tháng | Must | 3 | Q1-R, Q3, Q5 | Implemented & verified in API + `#qta` UI (append-only revisions, decision number/date, month-only verified); not formally accepted |
-| `FR-QTA-011` | Không giảm tổng dưới phần đã phân bổ | Must | 1 | Q1, Q1-R, Q3, Q4, Q5 | Implemented & verified in API + `#qta` UI (409 deficit/allocated alert verified in Chromium); not formally accepted |
-| `FR-QTA-020` | Đồng bộ nhóm & người dùng từ hệ thống | Must | 2 | Q1-R, Q2, Q5 | Implemented & verified in API + `#qta` UI (sync button, sync-run history, specialist preserved); not formally accepted |
-| `FR-QTA-021` | Cấu hình hạn mức theo từng mô hình của nhóm | Must | 2 | Q1-R, Q2, Q3, Q4, Q5 | Implemented & verified in API + `#qta` UI (per-model matrix & disable-removes-base verified in Chromium); not formally accepted |
-| `FR-QTA-022` | Nhóm AI chuyên biệt | Must | 2 | Q1-R, Q2, Q3, Q5 | Implemented & verified in API + `#qta` UI (create, members, deactivate/activate, additive lookup verified); not formally accepted |
-| `FR-QTA-030` | Quy tắc cộng dồn đa nhóm | Must | 2 | Q3, Q4, Q5 | Implemented & verified in API (incl. Q5 C6 sum invariant) + `#qta` UI (`1.000 (G1) + 3.000 (G2) = 4.000`); not formally accepted |
-| `FR-QTA-031` | Tra cứu hạn mức thực hưởng cá nhân | Must | 2 | Q3, Q4, Q5 | Implemented & verified in API (incl. Q5 C7 `check_ai_access`) + `#qta` UI (additive lookup, `NO_ENTITLEMENT`, `NOT_INTEGRATED` notice); not formally accepted |
-| `FR-QTA-032` | Làm mới đầu tháng | Must | 2 | Q1, Q4, Q5 | Implemented & verified in API, CLI & `#qta` UI (manual reset simulation, idempotent disabled state, append-only history); not formally accepted |
-| `FR-QTA-040` | Cắt / ngưng hạn mức cá nhân | Must | 3 | Q1-R, Q4, Q5 | Implemented & verified in API + `#qta` UI (`PAID_EXTERNAL_ONLY`, distinct operator vs `ordered_by`, balance untouched); not formally accepted |
-| `FR-QTA-041` | Khôi phục hạn mức | Must | 2 | Q1, Q4, Q5 | Implemented & verified in API + `#qta` UI (restore returns `ACTIVE`, appends `RESTORE` event, balance untouched); not formally accepted |
-| `FR-QTA-050` | Không chu kỳ ngoài tháng; không sửa giao dịch cũ | Must | 2 | Q1-R, Q2, Q3, Q4, Q5 | Implemented & verified in DB, API (Q5 C5 identifier check) & `#qta` UI (two-month lookup, `<input type="month">`, zero Edit/Delete); not formally accepted |
-| **Total** | **12 Must requirements** | **Must** | **25 ACs** + 5 RULEs | Q1–Q6 | **Q0–Q5 implemented & technically verified (API 581 passed, 1 skipped; browser 20 passed; awaiting Q5 review); Q6 handoff pending; formal acceptance 0/33** |
+| `FR-QTA-001` | Truy cập theo quyền | Must | 2 | Q1, Q1-R, Q2, Q3, Q4, Q5, Q6 | **Technically verified** (API + `#qta` UI + populated `0006→0008` empty-before-sync & zero implicit roles in `test_q6_qta_upgrade.py`); not formally accepted |
+| `FR-QTA-010` | Tổng hạn mức nhà trường theo tháng | Must | 3 | Q1-R, Q3, Q5, Q6 | **Technically verified** (API + `#qta` UI + 2-revision backup/restore in `test_qta_operations.py`); not formally accepted |
+| `FR-QTA-011` | Không giảm tổng dưới phần đã phân bổ | Must | 1 | Q1, Q1-R, Q3, Q4, Q5, Q6 | **Technically verified** (API + `#qta` UI + `test_qta_operations.py` 409 deficit guard); not formally accepted |
+| `FR-QTA-020` | Đồng bộ nhóm & người dùng từ hệ thống | Must | 2 | Q1-R, Q2, Q5, Q6 | **Technically verified** (API + `#qta` UI + post-upgrade sync in `test_q6_qta_upgrade.py` & restore in `test_qta_operations.py`); not formally accepted |
+| `FR-QTA-021` | Cấu hình hạn mức theo từng mô hình của nhóm | Must | 2 | Q1-R, Q2, Q3, Q4, Q5, Q6 | **Technically verified** (API + `#qta` UI + post-upgrade & restore checks); not formally accepted |
+| `FR-QTA-022` | Nhóm AI chuyên biệt | Must | 2 | Q1-R, Q2, Q3, Q5, Q6 | **Technically verified** (API + `#qta` UI + post-upgrade specialist enrollment & restore checks); not formally accepted |
+| `FR-QTA-030` | Quy tắc cộng dồn đa nhóm | Must | 2 | Q3, Q4, Q5, Q6 | **Technically verified** (API incl. C6 + `#qta` UI + restored `1.000 + 3.000 = 4.000` in `test_qta_operations.py`); not formally accepted |
+| `FR-QTA-031` | Tra cứu hạn mức thực hưởng cá nhân | Must | 2 | Q3, Q4, Q5, Q6 | **Technically verified** (API incl. C7 + `#qta` UI with Q6 wording `Không có hạn mức`/`Được dùng AI`/`ĐÃ CẮT` + restored lookup); not formally accepted |
+| `FR-QTA-032` | Làm mới đầu tháng | Must | 2 | Q1, Q4, Q5, Q6 | **Technically verified** (API, CLI, `#qta` UI + restored `COMPLETED` state & 409 repeat guard in `test_qta_operations.py`; host scheduler documented in `qta-handoff.md`); not formally accepted |
+| `FR-QTA-040` | Cắt / ngưng hạn mức cá nhân | Must | 3 | Q1-R, Q4, Q5, Q6 | **Technically verified** (API + `#qta` UI `ĐÃ CẮT` badge & post-restore suspend write in `test_qta_operations.py`); not formally accepted |
+| `FR-QTA-041` | Khôi phục hạn mức | Must | 2 | Q1, Q4, Q5, Q6 | **Technically verified** (API + `#qta` UI + restored suspension history in `test_qta_operations.py`); not formally accepted |
+| `FR-QTA-050` | Không chu kỳ ngoài tháng; không sửa giao dịch cũ | Must | 2 | Q1-R, Q2, Q3, Q4, Q5, Q6 | **Technically verified** (DB grants verified post-upgrade & post-restore, C5 OpenAPI check, `#qta` DOM invariants); not formally accepted |
+| **Total** | **12 Must requirements** | **Must** | **25 ACs** + 5 RULEs | Q0–Q6 | **Phase 4 Q0–Q6 technically complete & verified (API 583 passed, 1 skipped; browser 21 passed; awaiting Q6 review); handoff in [qta-handoff.md](qta-handoff.md); formal acceptance stays 0/33** |
 
 ---
 

@@ -2,6 +2,8 @@
 
 Read `README.md`, `docs/setup/PHASE_0_1.md`, `docs/architecture/BLUEPRINT_v1.md`, and the exact relevant FRD in `docs/frd/` before modifying code.
 
+**Implementing agents (Antigravity or any model) must also follow [docs/agents/ANTIGRAVITY_OPERATING_RULES.md](docs/agents/ANTIGRAVITY_OPERATING_RULES.md)** (stage authorization, evidence, report format, agent log, STOP conditions). Phase 5 CRT plan: [docs/phase5/CRT_IMPLEMENTATION_PLAN.md](docs/phase5/CRT_IMPLEMENTATION_PLAN.md).
+
 ## Milestone and scope
 
 - Phase 0 and Phase 1 established the demo and API/DB baseline. Phase 2 WP1–WP5 are accepted for continued source development. WP6 adds browser administration and WP7 supplies verification and handoff.

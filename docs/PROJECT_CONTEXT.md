@@ -1,7 +1,7 @@
 # AQ EduUAI — Project context
 
 **Audience:** a developer or reviewer (including an AI researcher new to backend work) opening this repository for the first time.
-**Prepared:** 2026-11-25 (M0); **updated 2026-11-27 after Phase 4 Q5**. Repository state described: branch `main`; Phase 3 MDL (M1–M7) and Phase 4 QTA (Q0, Q1, Q1-R, Q2, Q3, Q4, Q5) are implemented and technically verified.
+**Prepared:** 2026-11-25 (M0); **updated 2026-11-27 after Phase 4 Q6**. Repository state described: branch `main`; Phase 3 MDL (M1–M7) and Phase 4 QTA (Q0, Q1, Q1-R, Q2, Q3, Q4, Q5, Q6) are implemented and technically verified.
 **Rule for this file:** it links to the detailed documents instead of copying them. If a linked document and this file disagree, the linked document wins; fix this file.
 
 ## 1. What / why
@@ -11,8 +11,8 @@ AQ EduUAI is a standalone, independently deployable **university AI-governance**
 | Module | Meaning | FRD (canonical copy) | Server status |
 | --- | --- | --- | --- |
 | MDL | AI providers and models: registry, real connection test, primary/fallback routing, data-protection agreement (DPA) evidence, risk classification | [FRD MDL](frd/AQ-FRD-UAI-MDL-001.md) | **Implemented (M1–M7) and technically verified; not formally accepted; live-provider run pending** (see [Phase 3 plan](phase3/MDL_IMPLEMENTATION_PLAN.md), [handoff](phase3/mdl-handoff.md)) |
-| QTA | Quotas (monthly institutional cap, group × model quotas, additive lookup, kill-switch, monthly reset) | [FRD QTA](frd/AQ-FRD-UAI-QTA-001.md) | **In progress (Phase 4 Q0–Q5 implemented & technically verified, awaiting Q5 review: RBAC `0007`, 8-table schema `0008`, Q2–Q4 API/CLI, Q5 `#qta` Admin UI + Playwright tests & C5–C7; Q6 cross-module proof & handoff next; formal acceptance 0/33)** (see [Phase 4 plan](phase4/QTA_IMPLEMENTATION_PLAN.md), [Q5 report](phase4/reports/QTA_Q5_REPORT.md)) |
-| CRT | Credits (append-only ledger) | [FRD CRT](frd/AQ-FRD-UAI-CRT-001.md) | Not started (Phase 5) |
+| QTA | Quotas (monthly institutional cap, group × model quotas, additive lookup, kill-switch, monthly reset) | [FRD QTA](frd/AQ-FRD-UAI-QTA-001.md) | **Implemented (Phase 4 Q0–Q6) and technically verified, awaiting Q6 review; not formally accepted (`0/33`)** (see [Phase 4 plan](phase4/QTA_IMPLEMENTATION_PLAN.md), [handoff](phase4/qta-handoff.md), [Q6 report](phase4/reports/QTA_Q6_REPORT.md)) |
+| CRT | Individual grants / revocations (append-only ledger) | [FRD CRT](frd/AQ-FRD-UAI-CRT-001.md) | Planned, not started (Phase 5): [plan](phase5/CRT_IMPLEMENTATION_PLAN.md) |
 
 The company's shared framework is unavailable, so this repository supplies its own identity, permission, audit and directory foundation. Modules must stay adapter-friendly so a later framework can replace pieces.
 
@@ -109,8 +109,8 @@ Real, server-enforced: sign-in, sessions, RBAC grants, directory (units, users, 
 ## 8. Roadmap and boundaries for MDL / QTA / CRT
 
 - **MDL (Phase 3):** packages M0–M7 in [`docs/phase3/`](phase3/MDL_IMPLEMENTATION_PLAN.md). **M1–M7 are implemented and technically verified; formal acceptance (Tech Lead / Product Owner) is not recorded.** A synthetic demo provider replaces a real vendor for this project (Project Owner decision D15, `bash scripts/dev-up.sh --demo-provider`). External inputs still open: official risk criteria (OQ-09-01), statutory retention periods, legal confirmation of the D5 reading, QTA/CRT for end-to-end quota proof. Decisions: [register](phase3/MDL_OPEN_DECISIONS.md); architecture: [ADR-0003](architecture/ADR-0003-mdl.md) (*Proposed*, with owner-delegated decisions recorded).
-- **QTA (Phase 4):** stages Q0–Q6 in [`docs/phase4/`](phase4/QTA_IMPLEMENTATION_PLAN.md). **Q0–Q5 (RBAC `0007`, 8-table schema `0008`, PO decisions `PD-Q1..PD-Q6`, [ADR-0004](architecture/ADR-0004-qta.md), Q2–Q4 API/CLI, and Q5 `#qta` Admin UI + Playwright tests + C5–C7; [Q5 report](phase4/reports/QTA_Q5_REPORT.md)) are implemented and technically verified (API 581 passed, 1 skipped; browser 20 passed; awaiting Q5 review; formal acceptance 0/33).** Q6 (cross-module MDL isolation proof, backup/restore rehearsal & handoff) awaits separate authorization.
-- **CRT (Phase 5):** append-only ledger; token/credit conversion undefined. Not started.
+- **QTA (Phase 4):** stages Q0–Q6 in [`docs/phase4/`](phase4/QTA_IMPLEMENTATION_PLAN.md). **Q0–Q6 (RBAC `0007`, 8-table schema `0008`, PO decisions `PD-Q1..PD-Q6`, [ADR-0004](architecture/ADR-0004-qta.md), Q2–Q4 API/CLI, Q5 `#qta` Admin UI, and Q6 `FR-MDL-020 AC3` isolation proof, populated `0006 → 0008` upgrade, backup/restore rehearsal & [handoff](phase4/qta-handoff.md); [Q6 report](phase4/reports/QTA_Q6_REPORT.md)) are implemented and technically verified (API 583 passed, 1 skipped; browser 21 passed; awaiting Q6 review; formal acceptance 0/33).** Phase 5 (CRT) awaits separate authorization.
+- **CRT (Phase 5):** append-only ledger in "đơn vị hạn mức" per (person, model), current month only; token/credit conversion undefined. Planned in [`docs/phase5/CRT_IMPLEMENTATION_PLAN.md`](phase5/CRT_IMPLEMENTATION_PLAN.md) (stages C0–C6); not started. Implementing agents follow [`docs/agents/ANTIGRAVITY_OPERATING_RULES.md`](agents/ANTIGRAVITY_OPERATING_RULES.md).
 - Boundary rules between modules: MDL does not import quota or credit tables; a future QTA/CRT registers its own "where used" checks for model deactivation; no module bypasses the shared foundations in section 4.
 
 ## 9. Working with this repository

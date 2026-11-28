@@ -1,0 +1,17 @@
+ M CLAUDE.md
+ M apps/admin/assets/qta.mjs
+ M docs/PROJECT_CONTEXT.md
+ M docs/acceptance-matrix.md
+ M docs/architecture/ADR-0004-qta.md
+ M docs/phase3/MDL_REQUIREMENTS_TRACEABILITY.md
+ M docs/phase4/QTA_IMPLEMENTATION_PLAN.md
+ M docs/phase4/QTA_OPEN_DECISIONS.md
+ M docs/phase4/QTA_REQUIREMENTS_TRACEABILITY.md
+ M tests/browser/test_qta.py
+?? apps/api/tests/integration/test_q6_mdl_qta_isolation.py
+?? apps/api/tests/integration/test_q6_qta_upgrade.py
+?? docs/phase4/QTA_Q6_PROMPT.md
+?? docs/phase4/qta-handoff.md
+?? docs/phase4/reports/QTA_Q6_REPORT.md
+?? docs/phase4/reports/q6/
+?? tests/browser/test_qta_operations.py

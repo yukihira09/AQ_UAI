@@ -1,7 +1,7 @@
 # ADR-0004 · QTA monthly quotas by account group and kill-switch
 
-**Status:** Proposed overall. Six product/scope decisions (**PD-Q1..PD-Q6**) were recorded by the **Project Owner on 2026-11-26** for this standalone demo project following the independent review in [QTA_Q1_REVIEW.md](../phase4/QTA_Q1_REVIEW.md). Not signed off by a Tech Lead or institutional authority. Stages **Q0–Q4** (planning, access catalog `0007`, 8-table schema `0008`, Q2 registry/sync/quotas, Q3 live entitlements & append-only budgets, and Q4 kill-switch/restore, `check_ai_access`, events & monthly reset) are implemented in source; stages **Q5–Q6** (Admin UI and handoff) remain planned. This ADR **stays Proposed** until Tech Lead / formal acceptance is recorded.
-**Date:** 2026-11-26 (Q1-R; updated 2026-11-27 in Q4).
+**Status:** Proposed overall. Six product/scope decisions (**PD-Q1..PD-Q6**) were recorded by the **Project Owner on 2026-11-26** for this standalone demo project following the independent review in [QTA_Q1_REVIEW.md](../phase4/QTA_Q1_REVIEW.md). Not signed off by a Tech Lead or institutional authority. Stages **Q0–Q6** (planning, access catalog `0007`, 8-table schema `0008`, Q2–Q4 API/CLI, Q5 `#qta` Admin UI, and Q6 cross-module `FR-MDL-020 AC3` proof, populated `0006 → 0008` upgrade, backup/restore rehearsal & handoff) are implemented and technically verified (awaiting Q6 review). This ADR **stays Proposed** until Tech Lead / formal acceptance is recorded.
+**Date:** 2026-11-26 (Q1-R; updated 2026-11-27 in Q6).
 **Scope:** QTA only ([FRD](../frd/AQ-FRD-UAI-QTA-001.md)). MDL is read-only and unmodified; CRT is out of scope (Phase 5).
 **Detail:** [architecture](../phase4/QTA_ARCHITECTURE_AND_DECISIONS.md) · [decisions](../phase4/QTA_OPEN_DECISIONS.md) · [plan](../phase4/QTA_IMPLEMENTATION_PLAN.md) · [traceability](../phase4/QTA_REQUIREMENTS_TRACEABILITY.md).
 

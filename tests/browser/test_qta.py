@@ -115,7 +115,7 @@ def create_user_with_role(page, stack, unit_id, username, display_name, code, ro
 
 
 def sign_in_new_browser(browser, stack, username):
-    context = browser.new_context(locale="vi-VN")
+    context = browser.new_context(locale="vi-VN", timezone_id="Asia/Ho_Chi_Minh")
     user_page = context.new_page()
     user_page.goto(stack.admin)
     login(user_page, username, TEMPORARY)
@@ -496,7 +496,8 @@ def test_qta_budget_deficit_additive_and_mobile(page, stack, browser):
         expect(qta_page.locator("main")).to_contain_text("Tài khoản chưa thuộc nhóm hạn mức AI nào")
         solo_ext_row = qta_page.locator("tr", has_text="Mô hình Ngoài Pro")
         expect(solo_ext_row).to_contain_text("0 đơn vị hạn mức")
-        expect(solo_ext_row).to_contain_text("NO_ENTITLEMENT")
+        expect(solo_ext_row).to_contain_text("Không có hạn mức")
+        expect(solo_ext_row).not_to_contain_text("NO_ENTITLEMENT")
         assert_qta_dom_invariants(qta_page, check_consumption_cells=True)
     finally:
         ctx.close()
@@ -554,7 +555,8 @@ def test_qta_killswitch_restore_reset_and_events(page, stack, browser):
         susp_dlg.get_by_label("Người ra lệnh").fill("Hiệu trưởng")
         save(susp_dlg, "Xác nhận tạm ngưng")
 
-        expect(qta_page.locator("main")).to_contain_text("Đang tạm ngưng")
+        expect(qta_page.locator("main")).to_contain_text("ĐÃ CẮT")
+        expect(qta_page.locator("tr", has_text="q5.target")).to_contain_text("ĐÃ CẮT")
         expect(qta_page.locator("main")).to_contain_text("Người ra lệnh: Hiệu trưởng")
         # EXTERNAL blocked, INTERNAL still allowed, base entitlements untouched!
         ext_row = qta_page.locator("tr", has_text="Mô hình Ngoài Pro")

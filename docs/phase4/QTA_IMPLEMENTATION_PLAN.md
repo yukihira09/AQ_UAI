@@ -181,3 +181,19 @@ Q0 docs ─▶ Q1 schema/RBAC ─▶ Q1-R revision ─▶ Q2 registry/sync/quota
   - `docs/acceptance-matrix.md`, `docs/PROJECT_CONTEXT.md`, `CLAUDE.md`, `docs/architecture/ADR-0004-qta.md` (status updates keeping technical verification distinct from formal PO/TL acceptance).
 - **Exclusions:** No Phase 5 CRT implementation; no production deploy; no Git commit/push without explicit instruction.
 - **Gate:** Full `verify_phase2.sh` (disposable PostgreSQL 18, nginx, Chromium), `alembic check`, backup/restore rehearsal, and exact report of API, browser, static, and Compose config check results.
+
+### Q6 completion (2026-11-27)
+
+**Status: implemented, awaiting review.** Full 11-section report and evidence: [QTA_Q6_REPORT.md](reports/QTA_Q6_REPORT.md) (logs & SHA256 manifests under `docs/phase4/reports/q6/`). Operational handoff: [qta-handoff.md](qta-handoff.md).
+
+- **Delivered:**
+  - `apps/api/tests/integration/test_q6_mdl_qta_isolation.py` (**4.1**, `R17`): end-to-end `FR-MDL-020 AC3` proof with all 8 `qta_*` tables populated and the MDL tester holding a `4,000` additive entitlement (`1,000 + 3,000`), verifying FAILED & PASSED local fake-provider connection tests plus primary/fallback routing leave every QTA snapshot byte-identical with zero `qta_*` writes, backed by a positive control and a reverse-direction QTA burst proving zero `mdl_*` writes.
+  - `apps/api/tests/integration/test_q6_qta_upgrade.py` (**4.2**, `R18`): automated populated `0006_mdl_routing_and_styles → 0008_qta_schema` upgrade rehearsal (12 pre-QTA tables preserved byte-identically, `alembic check` clean, 8 empty QTA tables, `0007` roles/permissions without implicit grants, exact `QTA_RUNTIME_PRIVILEGES` & `DELETE` denial, idempotent second run, live sync/quotas/lookup/allocated).
+  - `tests/browser/test_qta_operations.py` (**4.3**, `R18`): full Q1–Q6 end-to-end population + custom-format mode-600 `pg_dump` / `--single-transaction --exit-on-error` `pg_restore` into a new database, verifying row-for-row QTA snapshot equality, restored `#qta` Chromium UI (2 budget revisions, additive `1.000 + 3.000 = 4.000` lookup, suspension history, `Đã làm mới` reset state), post-restore suspend write (`ĐÃ CẮT`), runtime `DELETE` refusal on `qta_events`, and `409 QTA_RESET_ALREADY_EXECUTED` on repeat reset.
+  - **4.4** (`R20`): wording fixes in `apps/admin/assets/qta.mjs` (`NO_ENTITLEMENT` → `"Không có hạn mức"`, `ACTIVE` → `"Được dùng AI"`, `SUSPENDED` → `"ĐÃ CẮT"`) and updated assertions + `timezone_id="Asia/Ho_Chi_Minh"` in `tests/browser/test_qta.py`.
+  - **4.5–4.6:** Created [qta-handoff.md](qta-handoff.md) and closed all Phase 4 documentation (`QTA_REQUIREMENTS_TRACEABILITY.md`, `MDL_REQUIREMENTS_TRACEABILITY.md` `FR-MDL-020 AC3` row, `QTA_OPEN_DECISIONS.md` `Q-g`/`Q-h` defaults, `ADR-0004-qta.md`, `PROJECT_CONTEXT.md`, `acceptance-matrix.md`, `CLAUDE.md`). Zero backend source (`apps/api/src/`), migration, `mdl.mjs`, or `apps/web/` edits.
+- **Verification (full `scripts/verify_phase2.sh` gate, `docs/phase4/reports/q6/final-gate.log`, exit 0):** static checks PASS, `alembic check` clean, 3/3 mutation proofs passed with byte-identical post-restore hashes, **API 583 passed, 1 skipped** (+2 over Q5 baseline 581), **browser 21 passed** (+1 over Q5 baseline 20).
+
+### Phase 4 technical closure
+
+All 12 `Must` requirements (`FR-QTA-001` through `FR-QTA-050`, 25 ACs) and all 5 `RULE-QTA-*` invariants of `AQ-FRD-UAI-QTA-001`, plus cross-module `FR-MDL-020 AC3`, are implemented and technically verified across PostgreSQL 18 (`0007`–`0008`), `/api/v1/qta`, `python -m aq_uai_api.qta.reset`, and `#qta` in Chromium/nginx. Technical closure is **not** formal acceptance (`docs/acceptance-matrix.md` remains `0/33`, `ADR-0004` stays *Proposed*). Phase 5 (CRT) requires separate authorization.
